@@ -1,7 +1,7 @@
 ---
 title: "Progress Photo Gallery: Visual Body Transformation Timeline"
 sidebarTitle: "Gallery"
-description: "Browse your chronological progress photo timeline in FocusFlow. Compare Front, Side, and Back photos across check-in dates to see your physical transformation."
+description: "Browse your chronological photo timeline in FocusFlow. Compare Front, Side, and Back progress photos across check-in dates to see your body transformation."
 ---
 
 The **Progress Gallery** is your private visual history of your physical transformation inside FocusFlow. Every time you submit a weekly check-in and attach progress photos, those images are automatically added to your gallery, building a chronological record that makes the changes to your body composition and muscle definition visible in a way that numbers and charts alone cannot capture. Seeing the actual difference between where you started and where you are today is one of the most powerful motivators in long-term training.
@@ -43,7 +43,7 @@ Scroll through the gallery entries to compare how your physique has changed betw
 Your gallery is entirely private to you. No other athlete can view it. Your **coach** can see the photos you have submitted through the **Reviews** tab on their coach dashboard — but only the photos associated with each submitted check-in, not a standalone gallery view. If you prefer certain check-ins not to include photos, simply leave the photo slots empty when submitting.
 
 <Note>
-  Photos in the gallery are stored in your **browser's localStorage**, not in the Firebase cloud. This means they are tied to the specific browser and device you used when you submitted each check-in. Switching to a different device, using a different browser, or clearing your browser's site data will make previously saved photos invisible in the gallery, even though the check-in records themselves (dates, measurements, comments, and scores) remain safely stored in Firestore.
+  Photos are stored as base64 data URLs embedded in the `Review` document, which is synced to Firestore and cached in your browser's `localStorage`. This means your photos are available on any device you sign in from, as long as the sync is up to date. However, clearing your browser's site data will remove the local cache, and photos will be re-fetched from Firestore the next time you open the app.
 
-  To preserve your photo history permanently across devices, enable the **Google Drive sync** toggle before submitting each weekly check-in. This uploads your photos to a linked Drive folder and stores a `driveFolderUrl` on the check-in record, giving you a permanent cloud backup you can access from any device.
+  For a permanent, device-independent backup that is independent of the Firestore document, enable the **Google Drive sync** toggle before submitting each weekly check-in. This uploads your photos to a linked Drive folder and stores a `driveFolderUrl` on the check-in record, giving you a permanent cloud copy you can access from any device at any time.
 </Note>

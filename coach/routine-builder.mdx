@@ -15,7 +15,7 @@ The Routine Builder can be opened from two places inside FocusFlow:
     Navigate to **Athletes → [Athlete] → Routines**, then click **New Routine** or the edit icon on an existing routine. The builder opens pre-loaded with that athlete's data.
   </Card>
   <Card title="Templates Tab" icon="rectangle-list">
-    Navigate to **Exercises & Templates → Templates**, then click a template's **Modify** button. The same editor interface opens, operating on the generic template rather than an athlete-specific routine.
+    Navigate to **Exercises & Templates → Mis Plantillas Planificadas**, then click a template's **Modificar** button. The same editor interface opens, operating on the generic template rather than an athlete-specific routine.
   </Card>
 </CardGroup>
 
@@ -106,7 +106,7 @@ export interface ExerciseSet {
     Enter a value in **Global Rest (seconds)** — for example, `180` for a 3-minute rest. This becomes the default rest timer between sets in the athlete's live workout session. Individual exercises can override this if needed. The value is stored as `globalRestSeconds` on the `Routine`.
   </Step>
   <Step title="Add training days">
-    Click **Add Day** in the Days Structure panel. FocusFlow automatically names new days sequentially (Día 1, Día 2, …). Rename each day to reflect its training focus — for example:
+    Click **Agregar Día** in the Days Structure panel. FocusFlow automatically names new days sequentially (Día 1, Día 2, …). Rename each day to reflect its training focus — for example:
 
     - `Day A – Push (Chest / Shoulders / Triceps)`
     - `Day B – Pull (Back / Biceps)`
@@ -115,12 +115,12 @@ export interface ExerciseSet {
     You can **duplicate** any day using the copy icon to reuse its exercise structure, or **delete** it via the trash icon. Days expand and collapse individually — click a day header to toggle it.
   </Step>
   <Step title="Add exercises to each day">
-    With a day expanded, click **Add Exercise**. A search panel appears with:
+    With a day expanded, click **Añadir Ejercicio**. A search panel appears with:
 
-    - A **text search** field (debounced, 150 ms) — type part of the exercise name.
+    - A **text search** field (debounced, 150 ms) — filters by exercise name.
     - A **category filter** dropdown — narrow results to Pecho, Espalda, Piernas, etc.
 
-    Click any result to add it instantly. If the exercise doesn't exist in the catalog yet, type its name and click **Create and Add** to create it on the fly and save it to your catalog simultaneously.
+    Click any result to add it instantly. If the exercise doesn't exist in the catalog yet, type its name and click **Crear y Añadir** to create it on the fly and save it to your catalog simultaneously.
 
     Added exercises default to **3 sets × 10 reps at RPE 8** with 0 kg expected weight.
   </Step>
@@ -138,13 +138,13 @@ export interface ExerciseSet {
     You can also reorder exercises within a day using the **▲ / ▼** arrows (visible on hover), or mark an exercise as **Optional** so it doesn't count against compliance if skipped.
   </Step>
   <Step title="Save the routine">
-    Click **Save Routine** in the top bar. The routine is persisted to Firestore and immediately accessible to the athlete. If `isActive: true`, it becomes the athlete's current running program.
+    Click **Guardar Rutina** in the top bar. The routine is persisted to Firestore and immediately accessible to the athlete. If `isActive: true`, it becomes the athlete's current running program.
   </Step>
 </Steps>
 
 ## Per-Set Customization
 
-By default, all sets in an exercise share the same `repsText` and `intensity`. Toggle **Customize Sets** on any exercise to switch into per-set mode — each set gets its own `targetReps` and `targetRpe` fields.
+By default, all sets in an exercise share the same `repsText` and `intensity`. Toggle **Personalizar Series** on any exercise to switch into per-set mode — each set gets its own `targetReps` and `targetRpe` fields.
 
 This is useful for:
 - **Wave loading** — `8 @ RPE 7`, `6 @ RPE 8`, `4 @ RPE 9`
@@ -162,11 +162,11 @@ sets: [
 ```
 
 When `customized` is active you can:
-- **Add a set** — click **Add Set**; the new set inherits the previous set's values.
+- **Add a set** — click **Añadir Serie**; the new set inherits the previous set's values.
 - **Edit any set** — change `targetReps` and `targetRpe` inline.
 - **Remove a set** — click the trash icon; remaining sets are automatically re-indexed.
 
-To revert to standard (uniform) mode, click **Remove Set Customization** — all sets reset to the exercise-level `repsText` and `intensity`.
+To revert to standard (uniform) mode, click **Quitar Personalización de Series** — all sets reset to the exercise-level `repsText` and `intensity`.
 
 <Note>
   Toggling off customization resets per-set overrides. The `setsCount` is preserved so you don't lose the number of sets, only the individual targets.
@@ -174,7 +174,7 @@ To revert to standard (uniform) mode, click **Remove Set Customization** — all
 
 ## Template Loading
 
-The **Quick Templates** panel on the left side of the Routine Builder lets you load any of your saved workout templates directly into the routine being built. Select a template from the dropdown — FocusFlow will deep-clone all days and exercises (assigning fresh IDs to every `RoutineDay` and `RoutineExercise`) so editing the loaded routine never affects the original template.
+The **Plantillas Rápidas** panel on the left side of the Routine Builder lets you load any of your saved workout templates directly into the routine being built. Select a template from the dropdown — FocusFlow will deep-clone all days and exercises (assigning fresh IDs to every `RoutineDay` and `RoutineExercise`) so editing the loaded routine never affects the original template.
 
 <Tip>
   If the routine already has days configured, FocusFlow will ask for confirmation before replacing them with the template's structure.
@@ -193,7 +193,7 @@ An athlete can have more than one routine in their profile at the same time. The
   </Card>
 </CardGroup>
 
-When you click **Save Routine** from the builder, the routine is saved with `isActive: true` by default. You can toggle `isActive` from the athlete's Routines sub-tab to swap which block is live.
+When you click **Guardar Rutina** from the builder, the routine is saved with `isActive: true` by default. You can toggle `isActive` from the athlete's Routines sub-tab to swap which block is live.
 
 ## Exporting Routines
 

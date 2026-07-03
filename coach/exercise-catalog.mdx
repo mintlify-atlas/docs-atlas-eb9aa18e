@@ -1,7 +1,7 @@
 ---
 title: "Exercise Catalog: Build and Search Your Exercise Library"
 sidebarTitle: "Exercise Catalog"
-description: "Add and search exercises in FocusFlow's per-coach catalog. Each exercise has a name, muscle group, equipment notes, and optional video link."
+description: "Add and search exercises in FocusFlow's per-coach catalog. Each exercise stores a name, muscle group category, and an optional movement description."
 ---
 
 Every coach in FocusFlow maintains their own personal exercise catalog — an independent library of movements that powers the exercise search inside the Routine Builder and the Template Editor. Exercises you add here are immediately available when programming any athlete's routine, making it easy to build a consistent vocabulary of movements you use across all your clients.
@@ -30,11 +30,11 @@ export interface Exercise {
 
 ## Navigating the Catalog
 
-Open the catalog by navigating to **Exercises & Templates** in the coach dashboard, then selecting the **Exercise Catalog** sub-tab. The view is split into two panels:
+Open the catalog by navigating to **Exercises & Templates** in the coach dashboard, then selecting the **Catálogo de Ejercicios** sub-tab. The view is split into two panels:
 
 <CardGroup cols={2}>
   <Card title="Add / Edit Form" icon="plus">
-    Left panel — a form with Name, Category, and Movement Summary fields. Used for both creating new exercises and editing existing ones.
+    Left panel — a form with Name, Category, and Movement Summary (Resumen del movimiento) fields. Used for both creating new exercises and editing existing ones.
   </Card>
   <Card title="Catalog List" icon="list">
     Right panel — a scrollable list of all your exercises with inline search and category filter. Shows name, category badge, and description for each entry.
@@ -56,25 +56,25 @@ The search is applied to the combined string `"${ex.name} ${ex.description || ""
 
 <Steps>
   <Step title="Open the Add Form">
-    In the Exercise Catalog sub-tab, the **Add Custom Exercise** form is visible in the left panel by default. If you were previously editing an exercise, click elsewhere to reset it.
+    In the **Catálogo de Ejercicios** sub-tab, the **Añadir Ejercicio personalizado** form is visible in the left panel by default. If you were previously editing an exercise, click elsewhere to reset it.
   </Step>
   <Step title="Enter the exercise name">
     Type the full movement name in the **Name** field. Be descriptive — for example `"Curl de Martillo con Mancuerna"` rather than just `"Curl"`. This name appears verbatim in the Routine Builder search results and on the athlete's workout screen.
   </Step>
   <Step title="Select a muscle category">
-    Choose the primary muscle group from the **Muscle Category** dropdown. This drives the category filter in the Routine Builder. Standard options are listed below.
+    Choose the primary muscle group from the **Categoría muscular** dropdown. This drives the category filter in the Routine Builder. Standard options are listed below.
   </Step>
   <Step title="Add movement instructions (optional)">
-    Use the **Movement Summary** textarea to describe execution cues, equipment, grip width, or any coaching notes — for example: `"Sit on incline bench with dumbbells, keep hips stable, full range of motion"`. This text is displayed in the catalog list and can also be surfaced to athletes.
+    Use the **Resumen del movimiento** textarea to describe execution cues, equipment, grip width, or any coaching notes — for example: `"Sit on incline bench with dumbbells, keep hips stable, full range of motion"`. This text is displayed in the catalog list and can also be surfaced to athletes.
   </Step>
   <Step title="Save">
-    Click **Save Exercise**. The exercise is written to Firestore under your coach account and immediately appears in the catalog list and the Routine Builder's exercise search.
+    Click **Guardar ejercicio**. The exercise is written to Firestore under your coach account and immediately appears in the catalog list and the Routine Builder's exercise search.
   </Step>
 </Steps>
 
 ## Standard Categories
 
-FocusFlow ships with six standard muscle categories. All exercises must belong to at least one category, which controls how they appear in filtered searches and on the athlete's session log.
+FocusFlow ships with five standard muscle categories available in the catalog form's **Categoría muscular** dropdown. All exercises must belong to at least one category, which controls how they appear in filtered searches and on the athlete's session log.
 
 <CardGroup cols={3}>
   <Card title="Pecho" icon="dumbbell">
@@ -92,26 +92,23 @@ FocusFlow ships with six standard muscle categories. All exercises must belong t
   <Card title="Brazos" icon="dumbbell">
     **Arms** — Bicep curls, tricep extensions, hammer curls, skull crushers. Covers both elbow flexors and extensors.
   </Card>
-  <Card title="Cardio" icon="heart-pulse">
-    **Cardio** — Treadmill, assault bike, rowing machine, jump rope, HIIT circuits. Any conditioning or aerobic work.
-  </Card>
 </CardGroup>
 
-You can also create exercises with a custom category string by typing it directly into the category field (when editing code or via future extended UI). Custom categories appear in filter dropdowns alongside the standard ones.
+Additional category values (such as `"Cardio"` or `"Otros"`) are supported by the data model and may appear in filter dropdowns when exercises carrying those categories are present in your catalog — for example, exercises created on the fly from the Routine Builder's **Crear y Añadir** flow can be assigned any category available at that point.
 
 ## Editing and Deleting Exercises
 
 Every exercise in the catalog list has two action buttons:
 
-- **Edit (pencil icon)** — Loads the exercise into the left-form for modification. Change the name, category, or description and click **Save Exercise** to update it in Firestore.
+- **Edit (pencil icon)** — Loads the exercise into the left-form for modification. Change the name, category, or description and click **Guardar ejercicio** to update it in Firestore.
 - **Delete (trash icon)** — Permanently removes the exercise from your catalog. Exercises already added to saved routines or templates retain their data (name, category, etc.) because `RoutineExercise` stores a snapshot of those fields directly.
 
 <Accordion title="Editing an existing exercise">
   1. Find the exercise in the catalog list (use search or category filter to narrow results).
   2. Click the **pencil icon** on the right side of its row.
   3. The left form pre-fills with the exercise's current name, category, and description.
-  4. Make your changes and click **Save Exercise**.
-  5. The catalog list updates immediately. The form header changes from "Add Custom Exercise" to "Edit Exercise" to indicate edit mode.
+  4. Make your changes and click **Guardar ejercicio**.
+  5. The catalog list updates immediately. The form header changes from **Añadir Ejercicio personalizado** to **Editar ejercicio** to indicate edit mode.
 </Accordion>
 
 ## Catalog Scope Per Coach
@@ -128,7 +125,7 @@ Each exercise belongs to the coach who created it. The `coachId` field on every 
 
 ## Quick-Creating Exercises from the Routine Builder
 
-You don't have to visit the catalog tab to add a new exercise. In the Routine Builder and Template Editor, if you type a name in the exercise search that doesn't match any existing entry, a **"Create and Add"** option appears inline. Clicking it:
+You don't have to visit the catalog tab to add a new exercise. In the Routine Builder and Template Editor, if you type a name in the exercise search that doesn't match any existing entry, a **"Crear y Añadir"** option appears inline. Clicking it:
 
 1. Creates a new `Exercise` in your catalog with the typed name and the currently selected category filter.
 2. Immediately adds it to the day's exercise list as a `RoutineExercise`.

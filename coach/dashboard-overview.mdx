@@ -11,66 +11,57 @@ The FocusFlow coach dashboard is your central command center for running every a
 Each tab is always visible in the top navigation bar. Tabs with pending activity display a live badge so nothing goes unnoticed.
 
 <CardGroup cols={2}>
-  <Card title="📊 Summary (Resumen)" icon="chart-line">
-    Your home screen. Displays four KPI cards — active clients, pending reviews, unread chat messages, and today's scheduled events — plus a prioritized list of check-ins that need your feedback today.
+  <Card title="📊 Resumen General" icon="chart-line">
+    Your home screen. Displays three KPI cards — active clients, pending reviews, and unanswered chats — plus a prioritized list of check-ins that need your feedback today.
   </Card>
-  <Card title="👥 Athletes (Atletas)" icon="users">
-    The central client management hub. Search and filter your roster, then open any athlete's detailed profile to prescribe routines, review stats, add notes, and more across 8 sub-tabs.
-  </Card>
-  <Card title="🏋️ Exercises & Templates" icon="dumbbell">
-    A two-part panel: a searchable exercise catalog (with accent-insensitive search) where you can add custom movements, and a template library for reusable multi-day workout programs you can clone onto any athlete.
-  </Card>
-  <Card title="📝 Reviews (Revisiones)" icon="clipboard-check">
-    A unified inbox showing every pending and completed weekly check-in from all your athletes. Evaluate wellness forms, view progress photos, and send written feedback without navigating athlete by athlete.
-  </Card>
-  <Card title="💬 Chat (Mensajería)" icon="message-circle">
-    Real-time messaging with all your clients. Features presence indicators, live typing signals, blue double-check read receipts, and an unread message counter badge on the tab icon.
+  <Card title="👥 Mis Clientes" icon="users">
+    The central client management hub. Search and filter your roster, then open any athlete's detailed profile to prescribe routines, review stats, add notes, and more across multiple sub-tabs.
   </Card>
   <Card title="📅 Agenda" icon="calendar">
     An interactive monthly/weekly calendar for scheduling presential sessions, follow-up calls, video calls, and physical assessments. Supports quick-create event forms and proximity alerts.
   </Card>
-  <Card title="💳 Billing (Facturación)" icon="credit-card">
+  <Card title="🏋️ Ejercicios" icon="dumbbell">
+    A two-part panel: a searchable exercise catalog (with accent-insensitive search) where you can add custom movements, and a template library for reusable multi-day workout programs you can clone onto any athlete.
+  </Card>
+  <Card title="📝 Bandeja de Rev" icon="clipboard-check">
+    A unified inbox showing every pending and completed weekly check-in from all your athletes. Evaluate wellness forms, view progress photos, and send written feedback without navigating athlete by athlete.
+  </Card>
+  <Card title="💳 Facturación" icon="credit-card">
     Financial control panel. Track each client's subscription plan, mark payments as paid, pending, or overdue, register payment methods, and view cumulative income reports.
   </Card>
-  <Card title="⚙️ Profile & Settings" icon="user">
+  <Card title="💬 Chat" icon="message-circle">
+    Real-time messaging with all your clients. An unread message counter badge appears on the tab icon whenever clients have sent you messages you have not yet read.
+  </Card>
+  <Card title="⚙️ Mi Perfil" icon="user">
     Edit your professional bio, display name, and avatar. Also houses the **Theme Selector** to change the entire app's visual appearance.
   </Card>
 </CardGroup>
 
 ## KPI Summary Cards
 
-When you land on the **Summary** tab, four metric cards give you an instant health-check of your business. All counts are calculated live from Firestore data.
+When you land on the **Resumen General** tab, three metric cards give you an instant health-check of your business. All counts are calculated live from Firestore data.
 
-<CardGroup cols={2}>
-  <Card title="Active Clients" icon="users">
+<CardGroup cols={3}>
+  <Card title="Clientes Activos" icon="users">
     The total number of client accounts currently linked to your coach profile. This count includes all clients regardless of subscription status.
   </Card>
-  <Card title="Pending Reviews" icon="clipboard-check">
+  <Card title="Revisiones Pendientes" icon="clipboard-check">
     The number of weekly check-ins submitted by athletes that have not yet been evaluated. This card pulses with a subtle animation when the count is above zero to draw your attention.
   </Card>
-  <Card title="Unread Messages" icon="message-circle">
+  <Card title="Chats sin responder" icon="message-circle">
     The count of chat messages sent to you that you have not yet read. The same number appears as a badge on the Chat tab icon.
-  </Card>
-  <Card title="Today's Events" icon="calendar">
-    The number of agenda events (sessions, calls, video meetings) scheduled for the current day, pulled directly from your Agenda calendar.
   </Card>
 </CardGroup>
 
-Beneath the KPI cards, the Summary tab renders a **priority action list** when pending reviews exist. Each entry shows the athlete's name, the date they submitted their check-in, and an **Evaluate Report** shortcut that takes you directly to the Reviews tab with that check-in pre-selected. When all reviews are up to date, the section is replaced by a confirmation panel so you know you are fully caught up.
+Beneath the KPI cards, the Resumen General tab renders a **priority action list** when pending reviews exist. Each entry shows the athlete's name, the date they submitted their check-in, and an **Evaluar reporte** shortcut that takes you directly to the Reviews tab with that check-in pre-selected. When all reviews are up to date, the section is replaced by a confirmation panel so you know you are fully caught up.
 
 ## Activity Feed
 
-The activity feed is embedded within the Summary tab and surfaces the most urgent items requiring your attention right now. It is not a passive log — every entry is an interactive shortcut:
-
-- **Pending check-in entries** link directly to the review evaluation form for that athlete.
-- **Unread message alerts** navigate you to the Chat tab with the relevant conversation open.
-- **Upcoming event reminders** open the Agenda tab focused on the relevant date.
-
-The feed is ordered by urgency: pending reviews appear first, followed by unread messages, then upcoming events. When no action is required, the feed shows a positive confirmation state so you can close the dashboard with confidence.
+The activity feed is embedded within the Resumen General tab and surfaces the most urgent items requiring your attention right now. It is not a passive log — every pending check-in entry is an interactive shortcut that links directly to the review evaluation form for that athlete. When no action is required, the feed shows a positive confirmation state so you can close the dashboard with confidence.
 
 ## Theme Selector
 
-FocusFlow ships with four premium visual themes that restyle the entire application interface — colors, glassmorphism intensities, gradient accents, and component palettes all change together. Themes are selected from the **Profile & Settings** tab and take effect instantly without a page reload.
+FocusFlow ships with four premium visual themes that restyle the entire application interface — colors, glassmorphism intensities, gradient accents, and component palettes all change together. Themes are selected from the **Mi Perfil** tab and take effect instantly without a page reload.
 
 | Theme | Personality | Primary Palette |
 |---|---|---|
@@ -80,5 +71,5 @@ FocusFlow ships with four premium visual themes that restyle the entire applicat
 | **Cosmic Slate** | Premium, dark | Deep space blues and slate |
 
 <Tip>
-  You can switch themes at any time from **Profile & Settings** (the last tab in the navigation bar). The change is saved automatically and persists across sessions — your athletes are never affected by your theme choice.
+  You can switch themes at any time from **Mi Perfil** (the last tab in the navigation bar). The change is saved automatically and persists across sessions — your athletes are never affected by your theme choice.
 </Tip>

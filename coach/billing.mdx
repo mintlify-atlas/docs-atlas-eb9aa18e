@@ -1,5 +1,5 @@
 ---
-title: "Billing: Track Athlete Subscriptions and Income"
+title: "Billing: Track Athlete Subscriptions and Platform Plan"
 sidebarTitle: "Billing"
 description: "Manage athlete subscription payments in FocusFlow: record monthly fees, mark invoices as paid or overdue, and view cumulative monthly income estimates."
 ---
@@ -119,7 +119,7 @@ Status is determined at render time by comparing `nextExpirationDate` (or the co
 
 If an athlete's payment lapses and you need to restrict access while awaiting resolution, the billing table includes a **Pausar / Activar** toggle per athlete. Pausing sets `isPaused: true` on the `User` record, immediately preventing the athlete from logging in. Reactivating restores access in one click.
 
-```
+```text
 Athlete access states:
   Active 🟢  →  isPaused: false
   Paused ⏸️  →  isPaused: true
@@ -129,7 +129,7 @@ Athlete access states:
 
 The **Resumen General** dashboard KPI panel surfaces an estimated monthly income figure derived from the sum of all active athletes' plan prices:
 
-```
+```text
 Estimated Monthly Income = Σ matchPlan.price for each active ClientProfile
 ```
 

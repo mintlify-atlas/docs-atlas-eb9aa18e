@@ -4,7 +4,7 @@ sidebarTitle: "Reviews"
 description: "Manage athlete weekly check-ins in FocusFlow: view wellness forms, progress photos, body measurements, and send coach feedback from a centralized inbox."
 ---
 
-The **Reviews** system is FocusFlow's structured weekly feedback loop between coach and athlete. At the end of each review period (7, 14, or 30 days, set per athlete in their `ClientProfile`), the athlete submits a check-in report containing their current body measurements, progress photos, subjective wellness scores, and a free-text comment. Coaches review each submission, write technical feedback, and optionally attach annotated images — creating an ongoing, documented dialogue that drives intelligent training adjustments over time.
+The **Reviews** system is FocusFlow's structured weekly feedback loop between coach and athlete. At the end of each review period (7, 14, or 30 days, set per athlete in their `ClientProfile`), the athlete submits a check-in report containing their current body measurements, progress photos, subjective wellness scores, and a free-text comment. Coaches review each submission and write technical feedback — creating an ongoing, documented dialogue that drives intelligent training adjustments over time.
 
 ## The `Review` Type
 
@@ -18,7 +18,7 @@ export interface Review {
   date: string; // YYYY-MM-DD
   measurements: BodyMeasurements;
   comment: string;
-  photos: string[]; // Base64 data URLs
+  photos: string[]; // Mock dataUrls or system images
   status: "pending" | "reviewed";
   coachFeedback?: string;
   feedbackPhotos?: string[];
@@ -96,9 +96,6 @@ Opening a review card expands the full submission. The left column belongs to th
   </Step>
   <Step title="Write technical feedback">
     Type your coaching notes, load adjustments, nutritional corrections, or habit guidance into the `coachFeedback` textarea. The placeholder reads: *"Indica ajustes de cargas, alimentación o hábitos…"*
-  </Step>
-  <Step title="Attach visual corrections (optional)">
-    Annotated images — technique diagrams, posture corrections, exercise demonstrations — can be attached as `feedbackPhotos`. These appear to the athlete under **Correcciones visuales enviadas**.
   </Step>
   <Step title="Submit the evaluation">
     Click **Validar y Enviar**. FocusFlow calls `onEvaluateReview(reviewId, feedback, photos)`, sets `status` to `"reviewed"`, stamps `reviewedAt`, and notifies: *"Revisión evaluada correctamente. El atleta recibirá feedback en su portal."*

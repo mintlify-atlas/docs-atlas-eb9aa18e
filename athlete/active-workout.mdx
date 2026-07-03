@@ -1,7 +1,7 @@
 ---
 title: "Log Workouts with FocusFlow's Interactive Training Mode"
 sidebarTitle: "Active Workout"
-description: "Start your assigned routine, log real-time sets with weight and reps, track rest with the built-in timer, and complete your session with a full workout summary."
+description: "Start your assigned routine, log real-time sets with weight and reps, track rest with the built-in timer, and complete your session with a workout summary."
 ---
 
 The Active Workout mode is FocusFlow's real-time training companion — built to live on your phone screen while you are between sets on the gym floor. It displays every exercise assigned for the day, lets you log exact weight and reps for each set, auto-starts a countdown rest timer the moment you tick a set as complete, and saves a full `WorkoutSummary` when you finish. Everything is optimised for one-handed use on a mobile screen.
@@ -136,13 +136,14 @@ Before tapping **Start Workout**, use the **date picker** that appears in the se
       routineId: string;
       dayId: string;
       dayName: string;
-      date: string;            // YYYY-MM-DD (or retroDate if back-logged)
+      date: string;             // YYYY-MM-DD (or retroDate if back-logged)
       timeSpentSeconds: number; // total elapsed seconds from the session stopwatch
       totalVolume: number;      // sum of (achievedReps × weightUsed) for all completed sets
       completionRate: number;   // percentage of sets completed vs sets planned
       isRestDay: boolean;
-      loggedExercises: { [routineExerciseId: string]: ExerciseSet[] };
-      loggedExerciseDetails: { [routineExerciseId: string]: { name: string; category: string; userNotes?: string } };
+      notes?: string;
+      loggedExercises?: { [routineExerciseId: string]: ExerciseSet[] };
+      loggedExerciseDetails?: { [routineExerciseId: string]: { name: string; category: string; userNotes?: string } };
     }
     ```
   </Step>

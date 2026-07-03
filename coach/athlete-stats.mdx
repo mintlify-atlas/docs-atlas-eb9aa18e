@@ -53,8 +53,8 @@ FocusFlow renders four distinct visualisations using **Recharts** inside `Progre
 
 ### Compliance Rate — *Porcentaje de Cumplimiento*
 
-<Card title="Percentage Indicator" icon="percent">
-  A single-figure compliance metric sourced from `WorkoutSummary.completionRate` and stored on `ClientProfile.routineComplianceRate`. Represents the ratio of completed sets (achieved) to the total planned sets (`setsCount × routineExercises`) across the athlete's logged history.
+<Card title="Radial Ring Indicator" icon="percent">
+  A radial SVG ring that renders the athlete's overall compliance percentage, sourced from `ClientProfile.routineComplianceRate` (passed directly as the `complianceRate` prop to `ProgressCharts`). The ring fill animates from 0% to the stored value. A caption below the percentage reads *"Rutina completada"* and explains that the metric reflects the ratio of successfully logged sets versus those planned by the coach.
 </Card>
 
 ## Data Sources
@@ -66,7 +66,7 @@ The table below maps each visualisation to the underlying Firestore collection a
 | Body Weight Evolution | `DailyWeight[]` | `fit_weight_logs` |
 | Total Training Volume | `WorkoutSummary[]` | `fit_summaries` |
 | Body Measurements | `BodyMeasurements[]` (from Reviews) | `fit_measurements_logs` |
-| Compliance Rate | `WorkoutSummary.completionRate` | `fit_summaries` |
+| Compliance Rate | `ClientProfile.routineComplianceRate` | `fit_profiles` |
 
 `AthleteStatsView` receives these as props keyed by `clientId`:
 
@@ -91,7 +91,7 @@ All charts are rendered with **[Recharts](https://recharts.org/)**, a composable
     Every chart fills its parent container width at 100%, making the layout fully responsive across desktop and tablet breakpoints.
   </Card>
   <Card title="Hover Tooltips" icon="cursor-arrow-rays">
-    `<Tooltip>` with a dark theme (`backgroundColor: "#020617"`) is enabled on all charts. Hovering any data point reveals the exact value and date.
+    `<Tooltip>` with a dark theme (`backgroundColor: "rgba(15, 23, 42, 0.85)"`) is enabled on all charts. Hovering any data point reveals the exact value and date.
   </Card>
   <Card title="Interactive Legends" icon="list">
     `<Legend>` components allow toggling individual data series on and off for multi-line charts (e.g. the measurements chart in `todos` mode).

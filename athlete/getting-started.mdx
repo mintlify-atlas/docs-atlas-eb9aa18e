@@ -1,5 +1,5 @@
 ---
-title: "Getting Started as an Athlete in FocusFlow"
+title: "Getting Started as a FocusFlow Athlete: First Steps"
 sidebarTitle: "Getting Started"
 description: "Log in to FocusFlow as an athlete, complete the onboarding questionnaire, and navigate your personalized dashboard with workout, progress, and chat tabs."
 ---
@@ -16,12 +16,14 @@ The questionnaire collects the following fields:
 |---|---|
 | `weight` | Current body weight in kilograms |
 | `height` | Height in centimetres |
-| `age` / `birthDate` | Age in years, or date of birth in `YYYY-MM-DD` format |
-| `biologicalSex` | `MALE` or `FEMALE` — used for body-composition formulas |
+| `age` | Age in years |
+| `birthDate` | Optional date of birth in `YYYY-MM-DD` format |
+| `biologicalSex` | Optional — `MALE` or `FEMALE`, used for body-composition formulas |
 | `sleepHours` | Average hours of sleep per night |
 | `stressLevel` | Perceived stress on a 1–5 scale (1 = low, 5 = very high) |
 | `digestionStatus` | Free-text descriptor such as `"Buena"` or `"Lenta"` |
 | `additionalNotes` | Optional free-text for anything else you want your coach to know |
+| `completedAt` | ISO 8601 timestamp recording when the questionnaire was submitted |
 
 <Note>
   You only see this questionnaire once. If you need to update any value after submitting, ask your coach to adjust it from the athlete profile page, or edit your details directly in the **Profile** tab.
@@ -32,25 +34,25 @@ The questionnaire collects the following fields:
 After completing the questionnaire you are taken to the main dashboard. The navigation bar at the top contains seven tabs you will use throughout your training journey.
 
 <CardGroup cols={2}>
-  <Card title="Workout (Entrenar)" icon="dumbbell">
+  <Card title="Mi Entrenamiento" icon="dumbbell">
     Shows today's scheduled training day from your assigned routine. Tap **Start Workout** to enter real-time active training mode where you log every set with weight and reps.
   </Card>
-  <Card title="Calendar (Calendario)" icon="calendar">
+  <Card title="Calendario" icon="calendar">
     Your weekly plan at a glance. Completed days are marked green, rest days show a recovery indicator, and upcoming days display the planned session name.
   </Card>
-  <Card title="Progress (Mi Progreso)" icon="chart-line">
+  <Card title="Mi Progreso" icon="chart-line">
     Log your daily fasting weight, enter body circumference measurements, and view interactive charts for weight trend, training volume, body measurements, and compliance rate.
   </Card>
-  <Card title="Check-in (Revisión Semanal)" icon="clipboard-check">
+  <Card title="Revisiones" icon="clipboard-check">
     Submit your weekly report to your coach: wellness scores, body measurements, a written comment, and up to three progress photos (Front, Side, Back).
   </Card>
-  <Card title="Gallery (Galería)" icon="images">
+  <Card title="Galería" icon="images">
     A chronological private photo timeline showing every Front, Side, and Back photo you have submitted in past check-ins so you can compare your transformation over time.
   </Card>
-  <Card title="Chat" icon="message-circle">
+  <Card title="Chat con Entrenador" icon="message-circle">
     Direct messaging with your coach. Includes online presence indicator, typing detection, read receipts, and the full conversation history from day one.
   </Card>
-  <Card title="Profile (Ajustes)" icon="user">
+  <Card title="Ajustes" icon="user">
     Edit your personal data, avatar, email, and target goal. This is also where you can install FocusFlow as a Progressive Web App (PWA) on your phone's home screen.
   </Card>
 </CardGroup>

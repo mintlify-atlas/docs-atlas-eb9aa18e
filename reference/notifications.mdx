@@ -1,5 +1,5 @@
 ---
-title: "Notification System: In-App and Browser Alerts"
+title: "Notification System: Alerts, Audio, and Browser Push"
 sidebarTitle: "Notifications"
 description: "How FocusFlow generates in-app notification badges, plays audio chimes, sends browser push notifications, and structures AppNotification objects."
 ---
@@ -172,7 +172,7 @@ if (!granted) {
 ### `sendBrowserNotification`
 
 ```typescript
-function sendBrowserNotification(title: string, body: string): void
+function sendBrowserNotification(title: string, message: string): void
 ```
 
 Fires a native OS-level notification if `Notification.permission === "granted"`. Uses a standard athletic dumbbell icon and the tag `"fit-app-alert"` (duplicate tags replace the previous notification rather than stacking).
@@ -181,7 +181,7 @@ Fires a native OS-level notification if `Notification.permission === "granted"`.
   The notification headline shown in the OS notification tray.
 </ParamField>
 
-<ParamField path="body" type="string" required>
+<ParamField path="message" type="string" required>
   The notification body text.
 </ParamField>
 
@@ -194,7 +194,7 @@ import { sendBrowserNotification } from "@/lib/notifications";
 
 sendBrowserNotification(
   "Nueva revisión de Carlos",
-  "Carlos García ha enviado su check-in semanal."
+  "Carlos García ha enviado su check-in semanal." // message
 );
 ```
 

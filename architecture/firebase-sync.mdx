@@ -1,5 +1,5 @@
 ---
-title: "Offline-First Firebase Sync in FocusFlow"
+title: "Offline-First Firebase Sync: Dirty Keys and Reconciliation"
 sidebarTitle: "Firebase Sync"
 description: "How FocusFlow persists data offline with dirty-key tracking, automatic cloud reconciliation, and transparent fallback to localStorage."
 ---
@@ -14,7 +14,7 @@ The foundation of FocusFlow's offline capability is `safeStorage`, defined in `s
 
 ```typescript
 // src/lib/storage.ts
-const safeStorage = {
+export const safeStorage = {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
   removeItem(key: string): void
@@ -241,9 +241,9 @@ The decision tree is:
         if (localMatch) {
           return {
             ...cloudReview,
-            photos: localMatch.photos?.length > 0
+            photos: localMatch.photos && localMatch.photos.length > 0
               ? localMatch.photos : cloudReview.photos,
-            feedbackPhotos: localMatch.feedbackPhotos?.length > 0
+            feedbackPhotos: localMatch.feedbackPhotos && localMatch.feedbackPhotos.length > 0
               ? localMatch.feedbackPhotos : cloudReview.feedbackPhotos,
           };
         }

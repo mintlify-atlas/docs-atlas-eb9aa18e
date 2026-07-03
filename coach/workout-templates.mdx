@@ -36,10 +36,10 @@ The `days` field uses the same `RoutineDay` → `RoutineExercise` → `ExerciseS
 
 <Steps>
   <Step title="Open the Templates sub-tab">
-    In the coach dashboard, navigate to **Exercises & Templates**, then click the **My Planned Templates** sub-tab. You'll see a gallery of all your existing templates plus a button to create a new one.
+    In the coach dashboard, navigate to **Exercises & Templates**, then click the **Mis Plantillas Planificadas** sub-tab. You'll see a gallery of all your existing templates plus a button to create a new one.
   </Step>
   <Step title="Start a new template">
-    Click **+ Template from Scratch** (the amber gradient button in the top-right corner). FocusFlow opens the **TemplateHandmadeEditor** — the same editing interface used in the Routine Builder — with blank fields.
+    Click **+ Plantilla a Mano** (the amber gradient button in the top-right corner). FocusFlow opens the **TemplateHandmadeEditor** — the same editing interface used in the Routine Builder — with blank fields.
   </Step>
   <Step title="Name and describe the template">
     Fill in:
@@ -64,19 +64,19 @@ The `days` field uses the same `RoutineDay` → `RoutineExercise` → `ExerciseS
     |---|---|
     | **Sets** | `4` |
     | **Reps** | `8-12`, `3x10`, `5` |
-    | **Methodology / RPE** | `RPE 8`, `RIR 2`, `Failure` |
+    | **Methodology / RPE** | `RPE 8`, `RIR 2`, `Fallo` |
     | **Initial Load (kg)** | `60` |
     | **Individual Instruction** | `"Tempo 3:0:1, strict 2min rest"` |
 
-    Quick-pick shortcuts below the Reps and RPE fields let you apply common schemes (`3x10`, `4x12`, `5x5`, `3x8` / `RPE 8`, `RPE 9`, `RIR 2`, `Failure`) in one click.
+    Quick-pick shortcuts below the Reps and RPE fields let you apply common schemes (`3x10`, `4x12`, `5x5`, `3x8` / `RPE 8`, `RPE 9`, `RIR 2`, `Fallo`) in one click.
 
     Use the **▲ / ▼** buttons to reorder exercises within a day.
   </Step>
   <Step title="Enable per-set customization (optional)">
-    Check the **⚙️ Customize sets one by one** checkbox on any exercise to unlock a set-by-set table where each row has its own **Reps** and **RPE** columns. Use **+ Add Set** and **− Remove Set** to adjust the set count. This is ideal for wave-loading schemes or exercises with planned back-off sets. See the [Routine Builder – Per-Set Customization](/coach/routine-builder#per-set-customization) section for the full `ExerciseSet` type reference.
+    Check the **⚙️ Personalizar series una a una** checkbox on any exercise to unlock a set-by-set table where each row has its own **Reps** and **RPE** columns. Use **+ Añadir Serie** and **− Quitar Serie** to adjust the set count. This is ideal for wave-loading schemes or exercises with planned back-off sets. See the [Routine Builder – Per-Set Customization](/coach/routine-builder#per-set-customization) section for the full `ExerciseSet` type reference.
   </Step>
   <Step title="Save the template">
-    Click **Save New Template** (or **Save Modifications** if editing an existing one) in the bottom action bar. The template is written to Firestore, appears in the template gallery, and is immediately available as a load option in the Routine Builder.
+    Click **Guardar Nueva Plantilla** (or **Guardar Modificaciones** if editing an existing one) in the bottom action bar. The template is written to Firestore, appears in the template gallery, and is immediately available as a load option in the Routine Builder.
   </Step>
 </Steps>
 
@@ -86,10 +86,10 @@ Loading a template into an athlete's routine is a one-click operation from two d
 
 <CardGroup cols={2}>
   <Card title="From the Routine Builder" icon="wand-magic-sparkles">
-    With the Routine Builder open for any athlete, find the **Quick Templates** panel on the left. Select the template from the dropdown. FocusFlow deep-clones all days and exercises — assigning fresh unique IDs to every `RoutineDay` and `RoutineExercise` — so the athlete's routine is a fully independent copy.
+    With the Routine Builder open for any athlete, find the **Plantillas Rápidas** panel on the left. Select the template from the dropdown. FocusFlow deep-clones all days and exercises — assigning fresh unique IDs to every `RoutineDay` and `RoutineExercise` — so the athlete's routine is a fully independent copy.
   </Card>
   <Card title="From the Athlete's Routines Sub-tab" icon="user">
-    Navigate to **Athletes → [Athlete] → Routines** and open the Routine Builder. The **Quick Templates** panel on the left lists all your saved templates. Selecting one populates the builder immediately, ready for any athlete-specific adjustments before saving.
+    Navigate to **Athletes → [Athlete] → Routines** and open the Routine Builder. The **Plantillas Rápidas** panel on the left lists all your saved templates. Selecting one populates the builder immediately, ready for any athlete-specific adjustments before saving.
   </Card>
 </CardGroup>
 
@@ -158,11 +158,11 @@ Here are the most widely used template structures coaches build in FocusFlow:
 
 You can modify any saved template at any time from the template gallery:
 
-1. Navigate to **Exercises & Templates → My Planned Templates**.
-2. Click **Modify** (pencil icon) on the template card.
+1. Navigate to **Exercises & Templates → Mis Plantillas Planificadas**.
+2. Click **Modificar** (pencil icon) on the template card.
 3. The TemplateHandmadeEditor opens pre-populated with the template's current data (a deep clone, so you're editing safely).
 4. Make changes to days, exercises, reps, or intensity values.
-5. Click **Save Modifications**.
+5. Click **Guardar Modificaciones**.
 
 <Note>
   **Template edits do not retroactively affect routines that have already been cloned to athletes.** Each clone is a fully independent copy stored under the athlete's profile. If you update a template after cloning it to several athletes, those athletes' routines remain unchanged — you would need to re-clone and re-apply the template if you want them to receive the updates.
@@ -201,5 +201,5 @@ The exported document includes:
 - A print button and an auto-print trigger (`window.print()`) so the coach or athlete can save directly to PDF.
 
 <Tip>
-  In the template gallery, every template card has an **Export PDF** button (teal icon) that calls this function directly — no custom code needed. Use it to hand printed programs to athletes before a session or attach them to email check-ins.
+  In the template gallery, every template card has an **Exportar PDF** button (teal icon) that calls this function directly — no custom code needed. Use it to hand printed programs to athletes before a session or attach them to email check-ins.
 </Tip>

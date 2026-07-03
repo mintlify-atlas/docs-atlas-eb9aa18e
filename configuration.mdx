@@ -64,7 +64,7 @@ The `firebase-applet-config.json` file is read at module initialization time ins
 
 FocusFlow ships with a minimal rule set that grants full read and write access to any authenticated user — including anonymous sessions. Deploy these rules from the **Firestore → Rules** tab in the Firebase Console or via the Firebase CLI.
 
-```
+```javascript firestore.rules
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {

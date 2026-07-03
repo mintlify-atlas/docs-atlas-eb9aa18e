@@ -1,7 +1,7 @@
 ---
 title: "Weekly Check-in: Submit Your Progress Report to Your Coach"
 sidebarTitle: "Check-in"
-description: "Submit your weekly check-in in FocusFlow: rate energy, sleep, stress, and diet adherence, enter body measurements, and upload Front, Side, and Back progress photos."
+description: "Submit your weekly FocusFlow check-in: rate energy, sleep, stress, and adherence, add body measurements, and upload Front, Side, and Back progress photos."
 ---
 
 The **Weekly Check-in** (Revisión Semanal) is your structured weekly communication channel with your coach. Think of it as a concise written report that captures how you felt, how your body is responding, and what your current measurements look like — all in one place. Your coach reviews every check-in, records observations, and replies with personalised feedback so you stay aligned on adjustments to your training or nutrition plan.
@@ -44,7 +44,7 @@ Upload three photos documenting your current physique. Each slot corresponds to 
 Tap the camera icon on each slot to either **take a photo directly** with your device camera or **upload a file** from your gallery. Images are automatically resized and compressed (max 400 × 500 px at 40% JPEG quality) before being stored to keep file sizes manageable.
 
 <Warning>
-  Progress photos are stored as base64 data URLs inside the `Review` document and in your browser's `localStorage`. They are **not uploaded to Firebase Firestore** due to document size constraints. This means photos are **device-specific** — if you clear your browser storage or switch to a different device, previously saved photos will no longer be visible in the Gallery tab. Use the **Google Drive sync** option (toggle the "Sync to Drive" switch before submitting) to permanently back up your photos to the cloud.
+  Progress photos are stored as base64 data URLs inside the `Review` document. The full `Review` document — including your photos — is synced to Firestore and also cached in your browser's `localStorage` for fast offline access. Because the base64 photo data is embedded directly in the document, very large images can increase sync times. Photos are compressed automatically (max 400 × 500 px at 40% JPEG quality) to keep sizes manageable. Use the **Google Drive sync** option (toggle the "Sync to Drive" switch before submitting) to also store originals in a permanent, device-independent cloud folder.
 </Warning>
 
 ### Google Drive Sync (Optional)
@@ -64,8 +64,8 @@ interface Review {
   measurements: BodyMeasurements;
   comment: string;
   photos: string[];             // base64 data URLs for each uploaded photo slot
-  status: "pending";            // always "pending" on initial submission
-  acknowledgedByClient: false;  // cleared once you read coach feedback
+  status: "pending" | "reviewed"; // "pending" on submission; changes to "reviewed" after coach feedback
+  acknowledgedByClient: boolean;  // false on submission; set to true once you read coach feedback
   driveFolderUrl?: string;      // present only if Drive sync was used
 }
 ```

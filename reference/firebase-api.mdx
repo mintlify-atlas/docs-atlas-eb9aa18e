@@ -1,7 +1,7 @@
 ---
 title: "Firebase API Reference: Cloud Persistence Functions"
 sidebarTitle: "Firebase API"
-description: "Reference for FocusFlow's Firebase persistence layer: saveToCloud, loadFromCloud, loadAllFromCloud, syncOfflineDataToCloud, authentication helpers, and error handling."
+description: "Reference for FocusFlow's Firebase persistence layer: saveToCloud, loadFromCloud, syncOfflineDataToCloud, SYNC_KEYS, auth helpers, and error handling."
 ---
 
 FocusFlow's `src/lib/firebase.ts` exports the core persistence layer built on Firebase Firestore and Authentication. Every write is first committed to a local offline backup before hitting Firestore, enabling a fully offline-first experience — if the network is unavailable, data is queued in a **dirty set** and pushed to the cloud automatically the next time connectivity is restored. This reference documents every exported function and constant in the module.

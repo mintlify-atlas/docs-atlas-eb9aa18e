@@ -1,7 +1,7 @@
 ---
 title: "Firestore Schema: Collections, Documents, and Data Layout"
 sidebarTitle: "Firestore Schema"
-description: "How FocusFlow stores data in Firebase Firestore: the single-collection coaching_data pattern, document structure, and mapping of sync keys to TypeScript types."
+description: "FocusFlow's Firestore schema: coaching_data collection, document payload structure, and sync key to TypeScript type mapping reference."
 ---
 
 FocusFlow uses a single Firestore collection (`coaching_data`) where each of the 16 sync keys is stored as its own top-level document. There are no nested sub-collections. Each document holds the entire dataset for that entity type as a JSON-serialised string, allowing the app to load, replace, and reconcile entire slices of state in a single read or write. This design trades granular query flexibility for simplicity and offline-first reliability.

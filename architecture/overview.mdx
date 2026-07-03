@@ -1,10 +1,10 @@
 ---
 title: "FocusFlow Architecture: Frontend, Firebase, and Offline Sync"
 sidebarTitle: "Overview"
-description: "How FocusFlow's React frontend, Firebase Firestore backend, offline-first storage layer, and role-based routing work together."
+description: "How FocusFlow's React 19 frontend, Firebase Firestore backend, and offline-first storage layer work together for role-based data sync."
 ---
 
-FocusFlow is built as a layered, offline-first single-page application. The React 18 frontend renders one of three role-specific dashboards — `CoachDashboard`, `ClientDashboard`, or `AdminDashboard` — based on the authenticated user's `UserRole`. All global application state is owned by a single `App.tsx` root component and flows down as props. Persistence is handled by a two-tier system: Firebase Firestore is the source of truth for cloud-synced data, while `safeStorage` (a hardened `localStorage` wrapper with an in-memory fallback) provides transparent offline resilience. Firebase Auth manages session identity, with anonymous sign-in as a zero-friction fallback and Google OAuth for Workspace integrations.
+FocusFlow is built as a layered, offline-first single-page application. The React 19 frontend renders one of three role-specific dashboards — `CoachDashboard`, `ClientDashboard`, or `AdminDashboard` — based on the authenticated user's `UserRole`. All global application state is owned by a single `App.tsx` root component and flows down as props. Persistence is handled by a two-tier system: Firebase Firestore is the source of truth for cloud-synced data, while `safeStorage` (a hardened `localStorage` wrapper with an in-memory fallback) provides transparent offline resilience. Firebase Auth manages session identity, with anonymous sign-in as a zero-friction fallback and Google OAuth for Workspace integrations.
 
 ---
 
@@ -12,7 +12,7 @@ FocusFlow is built as a layered, offline-first single-page application. The Reac
 
 <CardGroup cols={2}>
   <Card title="Presentation Layer" icon="monitor">
-    React 18 (Vite, ESM). Three dashboards rendered based on `UserRole`:
+    React 19 (Vite, ESM). Three dashboards rendered based on `UserRole`:
     `CoachDashboard`, `ClientDashboard`, and `AdminDashboard`. Routing is
     performed inline in `App.tsx` — no third-party router is used; the
     authenticated user's `role` field determines which component tree is
@@ -55,20 +55,30 @@ FocusFlow's component tree is rooted at `App.tsx`, which mounts the appropriate 
     - `ClientDashboard` — mobile-first athlete workspace
     - `AdminDashboard` — platform management console
   </Card>
-  <Card title="Coach Sub-components" icon="dumbbell">
-    Namespaced under `components/coach/`:
+  <Card title="Shared Feature Components" icon="dumbbell">
+    Shared components in `components/` (root), used by one or both dashboards:
     - `RoutineBuilder` — drag-and-drop routine editor
-    - `InteractiveTraining` — live session runner (coach view)
+    - `InteractiveTraining` — live workout session runner
     - `PlicometriaModule` — skinfold body-composition calculator
     - `AgendaCalendarView` — event scheduling calendar
     - `ProgressCharts` — Recharts metric dashboards
-  </Card>
-  <Card title="Client Sub-components" icon="user">
-    Namespaced under `components/client/`:
     - `CalendarView` — athlete's workout schedule
-    - `ProgressCharts` — weight, volume, and measurement graphs
-    - `PlicometriaModule` — self-service body-fat entry
-    - `InteractiveTraining` — live workout session runner
+    - `CoachClientNotes` — coach private notes panel
+    - `SearchableExerciseDropdown` — exercise search widget
+  </Card>
+  <Card title="Coach Tab Components" icon="layout-panel-left">
+    Namespaced under `components/coach/`:
+    - `AgendaTab` — agenda management tab
+    - `AthleteCompletedSessionsView` — completed session history
+    - `AthleteReviewsView` — client review management
+    - `AthleteStatsView` — athlete statistics view
+    - `BillingTab` — billing and subscription management
+    - `ExercisesTab` — exercise library management
+    - `ProfileTab` — coach profile settings
+    - `TemplateHandmadeEditor` — custom template editor
+
+    Namespaced under `components/client/`:
+    - `ClientProgressTab` — client-side progress overview
   </Card>
 </CardGroup>
 
@@ -129,9 +139,9 @@ The following describes the end-to-end lifecycle of data in FocusFlow, from logi
 ## Technology Choices
 
 <CardGroup cols={2}>
-  <Card title="React 18 + Vite" icon="bolt">
+  <Card title="React 19 + Vite" icon="bolt">
     Vite's ESM-native dev server and optimised production build pipeline
-    provide near-instant HMR. React 18's concurrent renderer enables
+    provide near-instant HMR. React 19's concurrent renderer enables
     smooth UI during async cloud bootstrap.
   </Card>
   <Card title="TypeScript" icon="code">
