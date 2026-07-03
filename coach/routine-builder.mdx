@@ -1,0 +1,247 @@
+---
+title: "Routine Builder: Program Workouts Day by Day"
+sidebarTitle: "Routine Builder"
+description: "Build multi-day workout routines for individual athletes with exercises, sets, RPE/RIR intensity targets, and optional per-set customization."
+---
+
+The Routine Builder is FocusFlow's advanced programming tool for coaches. It lets you construct structured, multi-day training blocks for individual athletes — complete with exercise selection, set and rep schemes, RPE or RIR intensity targets, expected loads, and optional per-set customization. Every routine you build is stored in Firestore, tied to the athlete's profile, and immediately visible to them in their workout panel when marked active.
+
+## Opening the Routine Builder
+
+The Routine Builder can be opened from two places inside FocusFlow:
+
+<CardGroup cols={2}>
+  <Card title="Athlete's Routines Sub-tab" icon="person-running">
+    Navigate to **Athletes → [Athlete] → Routines**, then click **New Routine** or the edit icon on an existing routine. The builder opens pre-loaded with that athlete's data.
+  </Card>
+  <Card title="Templates Tab" icon="rectangle-list">
+    Navigate to **Exercises & Templates → Templates**, then click a template's **Modify** button. The same editor interface opens, operating on the generic template rather than an athlete-specific routine.
+  </Card>
+</CardGroup>
+
+## Routine Structure
+
+FocusFlow routines follow a four-level type hierarchy: `Routine` → `RoutineDay` → `RoutineExercise` → `ExerciseSet`. Understanding these types helps you reason about how data flows from the builder into the athlete's live workout session.
+
+### Routine
+
+The top-level container, scoped to a specific athlete via `clientId`.
+
+```typescript
+export interface Routine {
+  id: string;
+  clientId: string;          // Links the routine to a specific athlete
+  name: string;              // e.g. "Hypertrophy Block – Mesocycle 1"
+  isActive: boolean;         // true = currently running, false = queued as "next"
+  days: RoutineDay[];
+  assignedAt: string;        // ISO string — when the coach assigned it
+  startDate?: string;        // Optional program start date (YYYY-MM-DD)
+  endDate?: string;          // Optional program end date (YYYY-MM-DD)
+  globalRestSeconds?: number; // Default rest timer between sets (in seconds)
+}
+```
+
+### RoutineDay
+
+A single training day within the routine.
+
+```typescript
+export interface RoutineDay {
+  id: string;
+  name: string;       // e.g. "Day A – Push", "Tuesday – Legs"
+  notes?: string;     // General instructions shown to the athlete at the top of the day
+  exercises: RoutineExercise[];
+  optional?: boolean; // If true, the athlete can skip this day without affecting compliance
+}
+```
+
+### RoutineExercise
+
+An exercise assigned to a day, holding all programming parameters.
+
+```typescript
+export interface RoutineExercise {
+  id: string;             // Unique within the routine
+  exerciseId: string;     // References the Exercise in the catalog
+  name: string;
+  category: string;
+  optional: boolean;      // Athlete can skip this specific exercise
+  setsCount: number;      // Total number of sets
+  repsText: string;       // Rep target as text, e.g. "8-10", "12", "3x10"
+  intensity: string;      // e.g. "RPE 8", "RIR 2", "Failure"
+  expectedWeight: number; // Suggested starting load in kg
+  notes: string;          // Per-exercise coaching cues
+  sets: ExerciseSet[];    // The individual set objects (auto-synced with setsCount)
+  customized?: boolean;   // true = each set has its own targetReps/targetRpe
+}
+```
+
+### ExerciseSet
+
+An individual set record, used both for programming targets and for tracking athlete performance.
+
+```typescript
+export interface ExerciseSet {
+  setIndex: number;      // 1-based position of this set
+  targetReps: string;    // Programmed rep target, e.g. "8-10" or "5"
+  achievedReps?: number; // Filled in by the athlete during the session
+  weightUsed?: number;   // Filled in by the athlete during the session
+  completed: boolean;
+  skipped: boolean;
+  targetRpe?: string;    // Per-set RPE/intensity, e.g. "@6.0", "9", "RIR 2"
+}
+```
+
+<Note>
+  When `customized` is `false` on a `RoutineExercise`, all sets share the same `repsText` and `intensity` values. When `customized` is `true`, each `ExerciseSet` has its own `targetReps` and `targetRpe`, allowing wave loading, back-off sets, and other advanced schemes.
+</Note>
+
+## Building a Routine Step by Step
+
+<Steps>
+  <Step title="Name the routine and set dates">
+    In the **General Configuration** panel on the left, enter a block name (e.g., "Hypertrophy Mesocycle 1"). Optionally set a **Start Date** and **End Date** to give the block a defined duration. These dates are stored on the `Routine` object and displayed to the athlete.
+  </Step>
+  <Step title="Set a global rest timer">
+    Enter a value in **Global Rest (seconds)** — for example, `180` for a 3-minute rest. This becomes the default rest timer between sets in the athlete's live workout session. Individual exercises can override this if needed. The value is stored as `globalRestSeconds` on the `Routine`.
+  </Step>
+  <Step title="Add training days">
+    Click **Add Day** in the Days Structure panel. FocusFlow automatically names new days sequentially (Día 1, Día 2, …). Rename each day to reflect its training focus — for example:
+
+    - `Day A – Push (Chest / Shoulders / Triceps)`
+    - `Day B – Pull (Back / Biceps)`
+    - `Day C – Legs (Quads / Glutes / Hamstrings)`
+
+    You can **duplicate** any day using the copy icon to reuse its exercise structure, or **delete** it via the trash icon. Days expand and collapse individually — click a day header to toggle it.
+  </Step>
+  <Step title="Add exercises to each day">
+    With a day expanded, click **Add Exercise**. A search panel appears with:
+
+    - A **text search** field (debounced, 150 ms) — type part of the exercise name.
+    - A **category filter** dropdown — narrow results to Pecho, Espalda, Piernas, etc.
+
+    Click any result to add it instantly. If the exercise doesn't exist in the catalog yet, type its name and click **Create and Add** to create it on the fly and save it to your catalog simultaneously.
+
+    Added exercises default to **3 sets × 10 reps at RPE 8** with 0 kg expected weight.
+  </Step>
+  <Step title="Configure each exercise">
+    For every exercise you can set:
+
+    | Field | Description |
+    |---|---|
+    | **Sets** | Number of working sets (`setsCount`) |
+    | **Reps (Target)** | Free-text rep target (`repsText`): `"8-10"`, `"5"`, `"12-15"` |
+    | **Intensity** | RPE or RIR string (`intensity`): `"RPE 8"`, `"RIR 2"`, `"Failure"` |
+    | **Base Weight (kg)** | Suggested starting load (`expectedWeight`) |
+    | **Notes** | Per-exercise cues shown to the athlete: `"Tempo 3:0:1"`, `"Pause at bottom"` |
+
+    You can also reorder exercises within a day using the **▲ / ▼** arrows (visible on hover), or mark an exercise as **Optional** so it doesn't count against compliance if skipped.
+  </Step>
+  <Step title="Save the routine">
+    Click **Save Routine** in the top bar. The routine is persisted to Firestore and immediately accessible to the athlete. If `isActive: true`, it becomes the athlete's current running program.
+  </Step>
+</Steps>
+
+## Per-Set Customization
+
+By default, all sets in an exercise share the same `repsText` and `intensity`. Toggle **Customize Sets** on any exercise to switch into per-set mode — each set gets its own `targetReps` and `targetRpe` fields.
+
+This is useful for:
+- **Wave loading** — `8 @ RPE 7`, `6 @ RPE 8`, `4 @ RPE 9`
+- **Back-off sets** — heavy top sets followed by lighter volume sets
+- **AMRAP finishers** — last set is max reps while the earlier sets are fixed
+
+```typescript
+// Example: 4-set wave on Back Squat
+sets: [
+  { setIndex: 1, targetReps: "5", targetRpe: "RPE 7",  completed: false, skipped: false },
+  { setIndex: 2, targetReps: "4", targetRpe: "RPE 8",  completed: false, skipped: false },
+  { setIndex: 3, targetReps: "3", targetRpe: "RPE 9",  completed: false, skipped: false },
+  { setIndex: 4, targetReps: "5", targetRpe: "RPE 7",  completed: false, skipped: false },
+]
+```
+
+When `customized` is active you can:
+- **Add a set** — click **Add Set**; the new set inherits the previous set's values.
+- **Edit any set** — change `targetReps` and `targetRpe` inline.
+- **Remove a set** — click the trash icon; remaining sets are automatically re-indexed.
+
+To revert to standard (uniform) mode, click **Remove Set Customization** — all sets reset to the exercise-level `repsText` and `intensity`.
+
+<Note>
+  Toggling off customization resets per-set overrides. The `setsCount` is preserved so you don't lose the number of sets, only the individual targets.
+</Note>
+
+## Template Loading
+
+The **Quick Templates** panel on the left side of the Routine Builder lets you load any of your saved workout templates directly into the routine being built. Select a template from the dropdown — FocusFlow will deep-clone all days and exercises (assigning fresh IDs to every `RoutineDay` and `RoutineExercise`) so editing the loaded routine never affects the original template.
+
+<Tip>
+  If the routine already has days configured, FocusFlow will ask for confirmation before replacing them with the template's structure.
+</Tip>
+
+## Active vs. Next Routine
+
+An athlete can have more than one routine in their profile at the same time. The `isActive` flag controls which one is currently running.
+
+<CardGroup cols={2}>
+  <Card title="Active Routine" icon="circle-check">
+    `isActive: true` — the routine shown to the athlete in their daily workout panel. Only one routine should be active at a time.
+  </Card>
+  <Card title="Next Routine" icon="clock">
+    `isActive: false` — a second routine queued to start. The coach can build the next training block in advance without disrupting the current program.
+  </Card>
+</CardGroup>
+
+When you click **Save Routine** from the builder, the routine is saved with `isActive: true` by default. You can toggle `isActive` from the athlete's Routines sub-tab to swap which block is live.
+
+## Exporting Routines
+
+FocusFlow can generate a printable HTML sheet of any routine or template using `generateTemplateHTML()` from `src/utils/exporters.ts`. The output is a fully styled, print-ready HTML document with a table of every day and exercise — suitable for handing to the athlete as a PDF or physical printout.
+
+```typescript
+generateTemplateHTML(
+  template: { name: string; description?: string; days: RoutineDay[] },
+  coachFullName: string,
+  coachEmail: string,
+  dateStr?: string
+): string
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `template` | `object` | An object with `name`, optional `description`, and `days` array |
+| `coachFullName` | `string` | Coach's full name, printed in the document header |
+| `coachEmail` | `string` | Coach's email, printed in the document header |
+| `dateStr` | `string` (optional) | Override the date string; defaults to today in `es-ES` locale |
+
+The generated HTML includes:
+- A teal gradient header card with the template name, description, coach info, and date.
+- One table per training day listing exercise name, category, sets, reps (or per-set breakdown for customized exercises), expected load, RPE/intensity, and coaching notes.
+- A print button and `window.print()` trigger on load.
+
+<Accordion title="Columns in the exported table">
+  | Column | Source field |
+  |---|---|
+  | EXERCISE | `RoutineExercise.name` |
+  | CATEGORY | `RoutineExercise.category` |
+  | SETS | `RoutineExercise.setsCount` |
+  | REPS | `repsText` or per-set breakdown if `customized: true` |
+  | LOAD | `RoutineExercise.expectedWeight` (kg) |
+  | RPE/INT | `RoutineExercise.intensity` or "Personalizado" |
+  | NOTES | `RoutineExercise.notes` |
+</Accordion>
+
+To trigger an export from your own code:
+
+```typescript
+import { generateTemplateHTML } from "@/utils/exporters";
+
+const printWindow = window.open("", "_blank");
+if (printWindow) {
+  printWindow.document.write(
+    generateTemplateHTML(routine, coach.fullName, coach.email)
+  );
+  printWindow.document.close();
+}
+```

@@ -1,0 +1,153 @@
+{
+  "projectType": "saas",
+  "projectName": "FocusFlow",
+  "projectDescription": "A full-stack gym management platform that connects coaches and athletes in real time, with workout tracking, progress analytics, skinfold body-composition analysis, billing, messaging, and scheduling.",
+  "theme": "almond",
+  "primaryColor": "#0f766e",
+  "lightColor": "#ccfbf1",
+  "darkColor": "#0d9488",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Overview",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "configuration"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/overview",
+              "architecture/data-model",
+              "architecture/firebase-sync"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Coach Guide",
+        "groups": [
+          {
+            "group": "Dashboard",
+            "pages": [
+              "coach/dashboard-overview",
+              "coach/athlete-management"
+            ]
+          },
+          {
+            "group": "Training",
+            "pages": [
+              "coach/routine-builder",
+              "coach/exercise-catalog",
+              "coach/workout-templates"
+            ]
+          },
+          {
+            "group": "Monitoring",
+            "pages": [
+              "coach/reviews-checkins",
+              "coach/athlete-stats",
+              "coach/plicometria"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "coach/messaging",
+              "coach/agenda-calendar",
+              "coach/billing"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Athlete Guide",
+        "groups": [
+          {
+            "group": "Using FocusFlow",
+            "pages": [
+              "athlete/getting-started",
+              "athlete/active-workout",
+              "athlete/progress-tracking",
+              "athlete/weekly-checkin",
+              "athlete/photo-gallery",
+              "athlete/chat"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Data Types",
+            "pages": [
+              "reference/types",
+              "reference/workout-math",
+              "reference/plicometria-formulas"
+            ]
+          },
+          {
+            "group": "Firebase & Storage",
+            "pages": [
+              "reference/firebase-api",
+              "reference/firestore-schema"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "reference/formatters",
+              "reference/notifications"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Bidirectional coach-athlete real-time platform",
+    "Interactive workout mode with live timer, rest countdown, and 1RM tracking",
+    "Advanced Routine Builder with day-by-day programming, RPE/RIR intensity, and templates",
+    "Centralized weekly check-in and reviews with photo upload and coach feedback",
+    "Skinfold (plicometría) body composition analysis using Jackson-Pollock 3/4/7-fold, Durnin-Womersley, and Yuhasz protocols",
+    "Interactive progress charts: body weight, total volume, body measurements, compliance rate",
+    "Real-time chat with read receipts, typing indicators, and online presence",
+    "Agenda/calendar for scheduling sessions, calls, and video calls with proximity alerts",
+    "Billing module for tracking subscription payments and plan status",
+    "Multi-theme UI: Emerald Athletic, Iron Matte, Cyberpunk Neon, Cosmic Slate",
+    "Offline-first architecture with Firebase Firestore sync and local-storage reconciliation",
+    "Role-based access: Coach, Athlete (Client), and Admin panels"
+  ],
+  "publicApiSurface": [
+    "saveToCloud(key, data): Promise<boolean>",
+    "loadFromCloud(key): Promise<any>",
+    "loadAllFromCloud(): Promise<Record<string, any>>",
+    "syncOfflineDataToCloud(): Promise<boolean>",
+    "getDirtyKeys(): Set<string>",
+    "reconcileLocalAndCloud(key, cloudData, localData): any",
+    "signInWithGoogleWorkspace(): Promise<string>",
+    "getGoogleAccessToken(): string | null",
+    "setGoogleAccessToken(token: string | null): void",
+    "calculate1RM(weight, reps, formula): number",
+    "getRMPercentage(oneRM, percentage): number",
+    "generateRMTable(weight, reps, formula): {reps, weight, percentage}[]",
+    "computePlicometriaValues(params): {sumaPliegues, densidadCorporal, porcentajeGrasa, masaGrasa, masaMagra}",
+    "calculateAgeAtDate(birthDateStr, logDateStr): number",
+    "formatTime(secs): string",
+    "formatDate(date, options?): string",
+    "formatWeight(weight): string",
+    "formatRestSeconds(secs): string",
+    "generateTemplateHTML(template, coachFullName, coachEmail, dateStr?): string",
+    "playNotificationSound(): void",
+    "playRestTimerEndSound(): void",
+    "SYNC_KEYS: string[]",
+    "handleFirestoreError(error, operationType, path): never",
+    "safeStorage: { getItem, setItem, removeItem, clear }"
+  ]
+}

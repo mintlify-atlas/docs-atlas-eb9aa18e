@@ -1,0 +1,58 @@
+---
+title: "FocusFlow: Gym Management for Coaches and Athletes"
+sidebarTitle: "Introduction"
+description: "FocusFlow is a real-time gym management platform connecting coaches and athletes with workout programming, analytics, and communication tools."
+---
+
+FocusFlow is a full-stack gym management SaaS platform purpose-built for personal trainers and high-performance athletes. It solves the coordination problem between coaches and their clients by providing a single, real-time workspace for programming workouts, tracking body composition, reviewing weekly check-ins, and communicating — all backed by Firebase Firestore so every change syncs instantly across devices.
+
+## Key Features
+
+FocusFlow is organized around six core capability areas, each accessible from a dedicated route in the Coach Dashboard.
+
+<CardGroup cols={2}>
+  <Card title="Routine Builder" icon="dumbbell" href="/coach/routine-builder">
+    Design day-by-day training blocks with exercises, sets, rep ranges, suggested weights, and RPE/RIR intensity targets. Load pre-built templates in one click or build from scratch.
+  </Card>
+  <Card title="Body Composition / Plicometría" icon="ruler" href="/coach/plicometria">
+    Record skinfold caliper measurements (Triceps, Subscapular, Biceps, Suprailiac, Chest, Abdomen, Thigh, Axillary) and automatically apply Jackson-Pollock 3-, 4-, and 7-fold formulas to estimate body fat percentage, lean mass, and fat mass.
+  </Card>
+  <Card title="Progress Analytics" icon="chart-line" href="/coach/athlete-stats">
+    Interactive Recharts and D3.js graphs tracking bodyweight evolution, total volume lifted per session, body measurements over time, and routine compliance rate — all scoped per athlete.
+  </Card>
+  <Card title="Weekly Check-ins" icon="clipboard-check" href="/coach/reviews-checkins">
+    A unified inbox of weekly check-ins from every athlete. Review wellbeing questionnaires, front/side/back progress photos, and send annotated feedback — without navigating profile by profile.
+  </Card>
+  <Card title="Real-Time Chat" icon="message-circle" href="/coach/messaging">
+    Bidirectional messaging between coaches and athletes with online presence indicators, typing indicators, read receipts (double blue check), and full conversation history.
+  </Card>
+  <Card title="Billing" icon="credit-card" href="/coach/billing">
+    Track monthly subscriptions per client. Mark payments as Paid, Pending, or Overdue, record payment methods, and generate quick income summaries.
+  </Card>
+</CardGroup>
+
+## Role-Based Access
+
+FocusFlow supports three distinct roles. Each role receives a tailored dashboard and access only to the data and actions relevant to their function.
+
+| Role | Description |
+|---|---|
+| **Coach** | Full control over client management, routine programming, exercise catalogue, templates, check-in reviews, real-time chat, agenda, and billing. Can pause or delete client accounts. |
+| **Client (Athlete)** | Mobile-optimized dashboard for logging workouts in real time, tracking bodyweight and body measurements, submitting weekly check-ins with progress photos, viewing coach feedback, and chatting with their trainer. |
+| **Admin** | Platform-level oversight. Can create, pause, or delete coach accounts, reassign athletes between coaches, manage billing plans for each coach, and promote users to admin status. |
+
+## Technology Stack
+
+FocusFlow is built on a modern, fully typed front-end stack with Firebase as the serverless backend.
+
+- **React 18** — UI rendering via Vite bundler for instant hot-module replacement during development
+- **TypeScript** — End-to-end type safety across all components, services, and data models
+- **Tailwind CSS 4.0** — Utility-first styling with unified theme variables powering four premium visual themes
+- **Firebase Firestore + Auth** — Hierarchical NoSQL real-time database with anonymous and Google authentication
+- **Recharts + D3.js** — Interactive charting library for all athlete progress analytics graphs
+- **Motion (`motion/react`)** — Smooth page transitions, tab-switch animations, and button micro-interactions
+- **Lucide React** — Consistent icon system used throughout the entire interface
+
+## Offline-First Architecture
+
+FocusFlow is designed to remain fully functional even when connectivity is lost. Every write is immediately persisted to a local offline backup in the browser, then marked as "dirty" in a sync queue. When connectivity resumes — whether after a brief drop or a full airplane mode session — FocusFlow automatically detects the `online` browser event and flushes all pending dirty keys back to Firestore via `syncOfflineDataToCloud()`. A live sync-status badge in the app header always reflects the current state: **Synced**, **Syncing…**, **N pending**, or **Offline**.

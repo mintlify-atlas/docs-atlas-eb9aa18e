@@ -1,0 +1,138 @@
+---
+title: "Track Body Weight, Measurements, and Training Volume"
+sidebarTitle: "Progress"
+description: "Log daily fasting weight, periodic body measurements, and view interactive progress charts for weight, volume, circumferences, and workout compliance in FocusFlow."
+---
+
+The **Progress** tab is your personal analytics dashboard inside FocusFlow. It consolidates every data point you have ever logged — daily fasting weight, body circumference measurements, skinfold readings (if enabled by your coach), and training volume from every completed workout — and surfaces them as interactive charts you can scroll through and compare at a glance. Everything updates the moment you save a new entry, so you always have an accurate picture of where you are on your journey.
+
+## Daily Weight Logging
+
+Tracking your bodyweight daily in the morning, before eating or drinking, gives your coach the cleanest possible signal of your weight trend over time.
+
+<Steps>
+  <Step title="Open the Progress tab">
+    Tap **Mi Progreso** in the navigation bar and locate the **Registrar peso diario** card.
+  </Step>
+  <Step title="Enter your weight">
+    Type your fasting bodyweight in kilograms into the input field (decimal values are accepted, e.g. `74.3`).
+  </Step>
+  <Step title="Select a date (optional)">
+    By default the entry is saved for today. To log a weight for a past date, tap the date picker and choose the correct day.
+  </Step>
+  <Step title="Save">
+    Tap **Guardar peso**. The entry is stored as a `DailyWeight` record:
+
+    ```typescript
+    interface DailyWeight {
+      date: string;  // YYYY-MM-DD
+      value: number; // weight in kg
+    }
+    ```
+
+    If a `DailyWeight` entry already exists for the selected date, submitting a new value **overwrites** the existing record. Use this to correct a mistyped weight without cluttering your history.
+  </Step>
+</Steps>
+
+<Note>
+  If the weight you enter differs from your previous log by more than 25%, FocusFlow shows a confirmation checkbox before saving. This guard prevents accidental typos (e.g. entering `740` instead of `74.0`) from distorting your weight chart.
+</Note>
+
+## Body Measurements Logging
+
+Circumference measurements capture changes in body shape that the scale alone cannot show. Log them periodically — weekly or fortnightly — alongside your weight entries.
+
+<Steps>
+  <Step title="Locate the measurements card">
+    On the **Progress** tab, find the **Nueva Medida Corporal** card (or **Editar Medida Corporal** if you are updating an existing date).
+  </Step>
+  <Step title="Fill in the measurement sites">
+    Enter values in centimetres for any of the available sites. You only need to fill the sites relevant to your programme — empty fields are ignored.
+
+    | Field | Body site |
+    |---|---|
+    | `cuello` | Neck circumference |
+    | `hombros` | Shoulder circumference |
+    | `pecho` | Chest / thorax |
+    | `bajoBusto` | Under-bust circumference |
+    | `brazoRelajado` | Relaxed upper arm |
+    | `brazoContraido` | Flexed upper arm |
+    | `antebraco` | Forearm |
+    | `muneca` | Wrist |
+    | `cintura` | Natural waist |
+    | `cinturaUmbilical` | Waist at navel level |
+    | `cadera` | Hip circumference |
+    | `gluteos` | Glutes |
+    | `musloSuperior` | Upper thigh |
+    | `musloMedio` | Mid-thigh |
+    | `gemelo` | Calf |
+    | `tobillo` | Ankle |
+
+  </Step>
+  <Step title="Set the measurement date">
+    Use the date picker to choose the date these measurements were taken. Measurements default to today if no date is selected.
+  </Step>
+  <Step title="Save">
+    Tap **Guardar medidas**. The entry is stored as a `BodyMeasurements` document keyed by date. Submitting for an existing date overwrites that record.
+  </Step>
+</Steps>
+
+<Tip>
+  Your coach may configure `requiredMeasurements` on your `ClientProfile` to limit which sites appear in the form. If you only see a subset of the fields above, that is intentional — only the sites relevant to your goal are shown.
+</Tip>
+
+## Progress Charts
+
+All logged data is visualised in the charts section below the entry forms. On medium and large screens the charts render in a **2-column grid** so you can compare multiple metrics side-by-side simultaneously. On mobile they stack in a single-column vertical layout for comfortable scrolling.
+
+### Weight Trend
+
+An **area chart** plotting your `DailyWeight` entries over time. The x-axis is the date, the y-axis is weight in kg. The filled area below the line makes upward and downward trends immediately visible. Use this chart to verify that your bodyweight is moving in the direction your goal requires.
+
+### Training Volume
+
+A **bar chart** displaying `WorkoutSummary.totalVolume` (kilograms lifted) for each completed session. Total volume is calculated as the sum of `achievedReps × weightUsed` across all completed, non-skipped sets in the session. Rising bars over time indicate progressive overload — a key driver of muscle and strength development.
+
+### Body Measurements
+
+A **line chart** for circumference data. A dropdown above the chart lets you select which measurement site to display (e.g. `cintura`, `cadera`, `brazoContraido`). Switch between sites to see how different areas of your body are changing independently of overall weight.
+
+### Compliance Rate
+
+A progress indicator that compares the number of sets you actually completed and logged against the total number of sets planned in your routine across all sessions. A high compliance rate confirms consistent execution. The value is derived from `WorkoutSummary.completionRate` averaged across your recent sessions.
+
+## Plicometría (Skinfold Body Composition)
+
+If your coach has enabled skinfold tracking on your profile (`isPlicometriaEnabled: true` on `ClientProfile`), the Progress tab gains a dedicated **Plicometría** sub-tab.
+
+<Steps>
+  <Step title="Switch to the Plicometría sub-tab">
+    Tap the **Plicometría** pill in the sub-navigation at the top of the Progress tab.
+  </Step>
+  <Step title="Enter skinfold measurements">
+    Using a skinfold calliper, measure the assigned sites in millimetres. The available sites depend on the protocol your coach has selected (`plicometriaProtocolId`):
+
+    - `3-fold` / `jackson_pollock_3` — Pectoral, Abdominal, Muslo anterior (men) or Tríceps, Suprailíaco, Muslo (women)
+    - `4-fold` — Tríceps, Subescapular, Suprailíaco, Bíceps
+    - `7-fold` / `jackson_pollock_7` — Pectoral, Abdominal, Muslo, Tríceps, Suprailíaco, Subescapular, Axilar medio
+    - `yuhasz` — Six-site protocol
+
+    Enter each value in the corresponding millimetre input field.
+  </Step>
+  <Step title="Instant results">
+    As soon as you save the entry, FocusFlow calculates and displays:
+
+    | Output | Description |
+    |---|---|
+    | `sumaPliegues` | Sum of all measured skinfolds in mm |
+    | `densidadCorporal` | Body density (g/mL) from the relevant Jackson–Pollock formula |
+    | `porcentajeGrasa` | Body fat percentage (%) |
+    | `masaGrasa` | Fat mass in kg |
+    | `masaMagra` | Lean mass in kg |
+
+  </Step>
+</Steps>
+
+<Note>
+  Plicometría measurements are most accurate when taken by the same person, at the same time of day, and on the same side of the body each time. Ask your coach whether you should self-measure or have them take the readings during a face-to-face session.
+</Note>

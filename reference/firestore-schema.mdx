@@ -1,0 +1,126 @@
+---
+title: "Firestore Schema: Collections, Documents, and Data Layout"
+sidebarTitle: "Firestore Schema"
+description: "How FocusFlow stores data in Firebase Firestore: the single-collection coaching_data pattern, document structure, and mapping of sync keys to TypeScript types."
+---
+
+FocusFlow uses a single Firestore collection (`coaching_data`) where each of the 16 sync keys is stored as its own top-level document. There are no nested sub-collections. Each document holds the entire dataset for that entity type as a JSON-serialised string, allowing the app to load, replace, and reconcile entire slices of state in a single read or write. This design trades granular query flexibility for simplicity and offline-first reliability.
+
+---
+
+## Collection structure
+
+```
+Firestore root
+└── coaching_data/
+    ├── fit_users                    → { payload: "[...User[]]", updatedAt: ISO }
+    ├── fit_client_profiles          → { payload: "[...ClientProfile[]]", updatedAt: ISO }
+    ├── fit_coach_profiles           → { payload: "[...CoachProfile[]]", updatedAt: ISO }
+    ├── fit_exercises                → { payload: "[...Exercise[]]", updatedAt: ISO }
+    ├── fit_templates                → { payload: "[...WorkoutTemplate[]]", updatedAt: ISO }
+    ├── fit_routines                 → { payload: "[...Routine[]]", updatedAt: ISO }
+    ├── fit_weight_logs              → { payload: "...", updatedAt: ISO }
+    ├── fit_measurements_logs        → { payload: "...", updatedAt: ISO }
+    ├── fit_plicometria_logs         → { payload: "[...PlicometriaLog[]]", updatedAt: ISO }
+    ├── fit_reviews                  → { payload: "[...Review[]]", updatedAt: ISO }
+    ├── fit_messages                 → { payload: "[...Message[]]", updatedAt: ISO }
+    ├── fit_agenda_events            → { payload: "[...AgendaEvent[]]", updatedAt: ISO }
+    ├── fit_summaries                → { payload: "[...WorkoutSummary[]]", updatedAt: ISO }
+    ├── fit_client_calendar_schedule → { payload: "...", updatedAt: ISO }
+    ├── fit_active_session           → { payload: "...", updatedAt: ISO }
+    └── fit_notifications            → { payload: "[...AppNotification[]]", updatedAt: ISO }
+```
+
+---
+
+## Document format
+
+Every document in `coaching_data` has exactly two fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `payload` | `string` | `JSON.stringify`'d data — either an array or a keyed object depending on the entity type. |
+| `updatedAt` | `string` | ISO 8601 timestamp set by the server at write time, e.g. `"2025-06-10T14:30:00.000Z"`. |
+
+When `loadFromCloud` reads a document it calls `JSON.parse(snap.data().payload)` to restore the original value. The `updatedAt` field is metadata only; FocusFlow's reconciliation logic does not currently use it to compare versions — it relies on the dirty-key set instead.
+
+<Expandable title="Example raw Firestore document (fit_routines)">
+
+```json
+{
+  "payload": "[{\"id\":\"routine_001\",\"clientId\":\"user_42\",\"name\":\"Mesociclo Fuerza A\",\"isActive\":true,\"days\":[...],\"assignedAt\":\"2025-05-01T08:00:00.000Z\"}]",
+  "updatedAt": "2025-06-10T14:30:00.000Z"
+}
+```
+
+</Expandable>
+
+---
+
+## Sync key → TypeScript type mapping
+
+The table below maps every sync key to its TypeScript type, the shape of the JSON stored in `payload`, and a short description of the data it holds.
+
+| Key | TypeScript Type | Payload shape | Description |
+|-----|----------------|---------------|-------------|
+| `fit_users` | `User[]` | Array | All platform users — coaches, clients, and admins. |
+| `fit_client_profiles` | `ClientProfile[]` | Array | Athlete profile metadata: goals, plan type, measurement config, payment dates. |
+| `fit_coach_profiles` | `CoachProfile[]` | Array | Coach subscription and billing data: plan tier, max athletes, commission rate. |
+| `fit_exercises` | `Exercise[]` | Array | Per-coach exercise catalog with name, category, and optional description. |
+| `fit_templates` | `WorkoutTemplate[]` | Array | Reusable workout templates a coach creates and assigns to clients. |
+| `fit_routines` | `Routine[]` | Array | Athlete-assigned active routines composed of `RoutineDay` objects. |
+| `fit_weight_logs` | `Record<clientId, DailyWeight[]>` | Object | Keyed by `clientId`; each value is an array of `{ date, value }` fasting-weight entries. |
+| `fit_measurements_logs` | `Record<clientId, BodyMeasurements[]>` | Object | Keyed by `clientId`; each value is an array of body-circumference measurement snapshots. |
+| `fit_plicometria_logs` | `PlicometriaLog[]` | Array | Skinfold measurement records including body-density and body-fat percentage calculations. |
+| `fit_reviews` | `Review[]` | Array | Weekly check-in submissions: body measurements, photos (local only), and coach feedback. |
+| `fit_messages` | `Message[]` | Array | Coach-athlete chat messages with sender/receiver IDs and read status. |
+| `fit_agenda_events` | `AgendaEvent[]` | Array | Scheduled coaching events: review sessions, payments, calls, in-person training. |
+| `fit_summaries` | `WorkoutSummary[]` | Array | Completed workout logs with volume, completion rate, and per-exercise set data. |
+| `fit_client_calendar_schedule` | `Record<clientId, ...>` | Object | Per-client calendar day states (rest day, active, skipped, etc.). |
+| `fit_active_session` | `ActiveWorkoutSession \| null` | Object or null | The in-progress workout session for the currently active client. Only one session is active at a time. |
+| `fit_notifications` | `AppNotification[]` | Array | App notification feed entries for both coaches and clients. |
+
+---
+
+## Security rules
+
+All reads and writes to `coaching_data` require an authenticated Firebase user. FocusFlow automatically signs users in anonymously on first load, which satisfies the `request.auth != null` check without requiring an explicit login flow.
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+<Warning>
+  The wildcard rule above grants any authenticated user (including anonymous users) read and write access to **all** documents. This is intentional for a single-tenant coaching tool but should be tightened before deploying a multi-tenant version. Consider scoping rules to `coaching_data/{docId}` and verifying the coach's UID against a server-side allowlist.
+</Warning>
+
+---
+
+## Offline-first behaviour and the dirty-key set
+
+Because every document holds an entire dataset, FocusFlow can serve all reads from a local `localStorage` backup without any network access. The write path works as follows:
+
+1. `saveToCloud` writes to `fit_offline_backup_<key>` in localStorage **synchronously**.
+2. It then attempts a Firestore `setDoc` with a 10-second timeout.
+3. If the Firestore write succeeds, the key is removed from `fit_cloud_dirty_keys`.
+4. If it fails, the key is added to `fit_cloud_dirty_keys`.
+5. On the next app launch (or when `syncOfflineDataToCloud` is called), pending keys are replayed to Firestore.
+
+<Note>
+  The single-document-per-key pattern means every write replaces the **entire array** for that entity type. For example, adding one new `Message` requires serialising and uploading the entire `Message[]` array. For small-to-medium datasets this is fast and simple. For larger coaches with thousands of messages or summaries, consider batching writes or migrating hot collections to per-document sub-collections.
+</Note>
+
+---
+
+## Photo storage exception
+
+`Review.photos` and `Review.feedbackPhotos` are **never written to Firestore**. Photo data (base64 data-URLs or blob references) remains in local storage only. When `loadFromCloud` reads `fit_reviews`, the `reconcileLocalAndCloud` function restores photo arrays from the local backup into the cloud-sourced review objects before returning them to the app.
+
+This keeps Firestore document sizes manageable and avoids Firestore's 1 MiB document size limit. For persistent photo storage, FocusFlow routes uploads through Google Drive via the `signInWithGoogleWorkspace` OAuth flow.

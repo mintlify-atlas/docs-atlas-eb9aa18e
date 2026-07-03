@@ -1,47 +1,109 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with FocusFlow in 5 Minutes"
+sidebarTitle: "Quickstart"
+description: "Clone FocusFlow, configure Firebase, run the dev server, and log in as a coach or athlete — step by step in under 5 minutes."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
-
-## Prerequisites
-
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+This guide walks you from a blank machine to a fully running FocusFlow instance. You'll clone the repository, install dependencies, wire up your Firebase project, and authenticate as a coach, athlete, or admin — all in under five minutes.
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+
+  <Step title="Clone the repository">
+    Pull the FocusFlow source code from GitHub and move into the project directory.
 
     ```bash
-    npm install your-package
+    git clone https://github.com/piratta/gymApp.git && cd gymApp
     ```
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+
+  <Step title="Install dependencies">
+    Install all Node.js packages. Use whichever package manager you prefer.
+
+    <CodeGroup>
+      ```bash npm
+      npm install
+      ```
+
+      ```bash yarn
+      yarn
+      ```
+
+      ```bash pnpm
+      pnpm install
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Configure environment variables">
+    Copy the provided example file to `.env` and fill in your credentials. The three variables control AI features, OAuth callbacks, and Google Workspace sign-in.
 
     ```bash
-    your-cli init
+    cp .env.example .env
+    ```
+
+    Open `.env` and replace the placeholder values:
+
+    ```env .env
+    # Required for Gemini AI API calls.
+    # AI Studio automatically injects this at runtime from user secrets.
+    # Users configure this via the Secrets panel in the AI Studio UI.
+    GEMINI_API_KEY="MY_GEMINI_API_KEY"
+
+    # The URL where this applet is hosted.
+    # AI Studio automatically injects this at runtime with the Cloud Run service URL.
+    # Used for self-referential links, OAuth callbacks, and API endpoints.
+    APP_URL="MY_APP_URL"
+
+    # Optional — Google OAuth client ID for Google Workspace sign-in.
+    VITE_OAUTH_CLIENT_ID=
     ```
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+
+  <Step title="Set up Firebase">
+    FocusFlow reads its Firebase configuration from `firebase-applet-config.json` in the project root. You need a Firebase project with Firestore (Native mode) and Authentication (Anonymous + Google providers) enabled.
+
+    1. Go to [console.firebase.google.com](https://console.firebase.google.com) and create a new project.
+    2. Navigate to **Build → Firestore Database** and create a database in **Native mode**.
+    3. Navigate to **Build → Authentication → Sign-in method** and enable both **Anonymous** and **Google** providers.
+    4. Go to **Project settings → General → Your apps**, register a Web app, and copy the `firebaseConfig` object values into `firebase-applet-config.json`:
+
+    ```json firebase-applet-config.json
+    {
+      "projectId": "your-project-id",
+      "appId": "your-app-id",
+      "apiKey": "your-api-key",
+      "authDomain": "your-project-id.firebaseapp.com",
+      "firestoreDatabaseId": "(default)",
+      "storageBucket": "your-project-id.firebasestorage.app",
+      "messagingSenderId": "your-messaging-sender-id"
+    }
+    ```
+  </Step>
+
+  <Step title="Start the development server">
+    Launch FocusFlow on port 3000, bound to all interfaces so it's reachable from other devices on the same network.
 
     ```bash
-    your-cli start
+    npm run dev
     ```
+
+    The app will be available at **[http://localhost:3000](http://localhost:3000)**.
   </Step>
+
+  <Step title="Log in">
+    On the login screen, enter credentials for an existing user or create a new one through the **Admin Dashboard**.
+
+    The default seed user that ships with a fresh Firestore database is:
+
+    | Role | Username | Password |
+    |---|---|---|
+    | Admin | `admin` | `admin` |
+
+    Log in as **admin** to create your first coach account, then log in as that coach to add athlete (client) accounts. Roles available in the system are `coach`, `client`, and `admin`.
+  </Step>
+
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
-
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+<Note>
+  If no active Firebase user session is found on startup, FocusFlow automatically signs in **anonymously** via Firebase Authentication. This means you can open the app immediately — even before configuring real Firebase credentials — and explore the full UI with seed data. The anonymous session satisfies Firestore security rules, so all read and write operations work as expected while you finish setting up your project.
+</Note>

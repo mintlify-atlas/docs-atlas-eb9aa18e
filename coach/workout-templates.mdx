@@ -1,0 +1,205 @@
+---
+title: "Workout Templates: Build Reusable Training Programs"
+sidebarTitle: "Templates"
+description: "Create reusable workout templates in FocusFlow and clone them to any athlete's routine in one click. Supports day-by-day structure with full exercise configuration."
+---
+
+Workout templates in FocusFlow are generic, reusable training programs that are not tied to any specific athlete. A template defines a complete day-by-day training structure — including exercises, sets, reps, intensity targets, and coaching notes — that you can build once and clone to any athlete's routine with a single click. Templates save significant time when you work with groups of athletes following similar training methodologies, and they serve as the foundation for your programming library.
+
+## The WorkoutTemplate Type
+
+Templates share the same internal structure as athlete-specific routines, using `RoutineDay` and `RoutineExercise` objects, but they are stored independently in Firestore and carry no `clientId`.
+
+```typescript
+export interface WorkoutTemplate {
+  id: string;
+  name: string;
+  description: string;
+  days: RoutineDay[];
+  globalRestSeconds?: number; // Default rest period between sets, in seconds
+  coachId?: string;           // Scopes the template to the coach who created it
+}
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `id` | Yes | Auto-generated (`"temp_" + Date.now() + random suffix`) |
+| `name` | Yes | Descriptive template name, e.g. `"PPL – Hypertrophy 6-Day"` |
+| `description` | Yes | Brief objective or target audience, e.g. `"Anterior deltoid, pec, tricep focus"` |
+| `days` | Yes | Array of `RoutineDay` objects — the full day-by-day program |
+| `globalRestSeconds` | No | Inherited by routines cloned from this template |
+| `coachId` | No | Set automatically to the logged-in coach's `id` |
+
+The `days` field uses the same `RoutineDay` → `RoutineExercise` → `ExerciseSet` hierarchy as athlete routines. See the [Routine Builder](/coach/routine-builder) reference for full type documentation on those nested types.
+
+## Creating a Template
+
+<Steps>
+  <Step title="Open the Templates sub-tab">
+    In the coach dashboard, navigate to **Exercises & Templates**, then click the **My Planned Templates** sub-tab. You'll see a gallery of all your existing templates plus a button to create a new one.
+  </Step>
+  <Step title="Start a new template">
+    Click **+ Template from Scratch** (the amber gradient button in the top-right corner). FocusFlow opens the **TemplateHandmadeEditor** — the same editing interface used in the Routine Builder — with blank fields.
+  </Step>
+  <Step title="Name and describe the template">
+    Fill in:
+    - **Template Name** *(required)* — give it a clear, descriptive name you'll recognize when loading it: `"Push – Hypertrophy Male"`, `"Torso A – Heavy"`, `"Fullbody 3×/week Beginner"`.
+    - **Description / Objective** — describe the training goal or population, e.g. `"Anterior delts, pec, and triceps focus. Hypertrophy range 8–12 reps"`.
+    - **Global Rest (s)** — optional default rest timer in seconds (e.g., `180` for 3 minutes). Cloned routines inherit this value.
+  </Step>
+  <Step title="Add training days">
+    Click the **+** button in the **Day Distribution** left panel to add a training day. FocusFlow names it automatically (Día 1, Día 2, …). Click any day in the left panel to open it in the **right workspace**, then:
+    - Edit the **day name** — e.g., `"Day 1: Heavy Torso"`, `"Day B – Pull"`.
+    - Add **coaching notes** — general instructions shown at the top of the day when the athlete trains.
+    - Check **Mark day as optional** if athletes can skip this day without it counting against their compliance rate.
+
+    You can **duplicate** any day (copy icon) or **delete** it (trash icon) from the left panel.
+  </Step>
+  <Step title="Add and configure exercises">
+    With a day open in the right workspace, use the **SearchableExerciseDropdown** at the bottom to find exercises from your catalog. Type a name or browse by category, then select an exercise to add it to the day's list.
+
+    For each exercise, set:
+
+    | Field | Example |
+    |---|---|
+    | **Sets** | `4` |
+    | **Reps** | `8-12`, `3x10`, `5` |
+    | **Methodology / RPE** | `RPE 8`, `RIR 2`, `Failure` |
+    | **Initial Load (kg)** | `60` |
+    | **Individual Instruction** | `"Tempo 3:0:1, strict 2min rest"` |
+
+    Quick-pick shortcuts below the Reps and RPE fields let you apply common schemes (`3x10`, `4x12`, `5x5`, `3x8` / `RPE 8`, `RPE 9`, `RIR 2`, `Failure`) in one click.
+
+    Use the **▲ / ▼** buttons to reorder exercises within a day.
+  </Step>
+  <Step title="Enable per-set customization (optional)">
+    Check the **⚙️ Customize sets one by one** checkbox on any exercise to unlock a set-by-set table where each row has its own **Reps** and **RPE** columns. Use **+ Add Set** and **− Remove Set** to adjust the set count. This is ideal for wave-loading schemes or exercises with planned back-off sets. See the [Routine Builder – Per-Set Customization](/coach/routine-builder#per-set-customization) section for the full `ExerciseSet` type reference.
+  </Step>
+  <Step title="Save the template">
+    Click **Save New Template** (or **Save Modifications** if editing an existing one) in the bottom action bar. The template is written to Firestore, appears in the template gallery, and is immediately available as a load option in the Routine Builder.
+  </Step>
+</Steps>
+
+## Cloning a Template to an Athlete
+
+Loading a template into an athlete's routine is a one-click operation from two different places:
+
+<CardGroup cols={2}>
+  <Card title="From the Routine Builder" icon="wand-magic-sparkles">
+    With the Routine Builder open for any athlete, find the **Quick Templates** panel on the left. Select the template from the dropdown. FocusFlow deep-clones all days and exercises — assigning fresh unique IDs to every `RoutineDay` and `RoutineExercise` — so the athlete's routine is a fully independent copy.
+  </Card>
+  <Card title="From the Athlete's Routines Sub-tab" icon="user">
+    Navigate to **Athletes → [Athlete] → Routines** and open the Routine Builder. The **Quick Templates** panel on the left lists all your saved templates. Selecting one populates the builder immediately, ready for any athlete-specific adjustments before saving.
+  </Card>
+</CardGroup>
+
+<Note>
+  If the routine already has days configured when you load a template, FocusFlow will prompt for confirmation before replacing the existing structure. Choosing to proceed replaces all current days and exercises with the template's cloned data.
+</Note>
+
+The clone process assigns new IDs using the pattern:
+- Days: `"day_" + Date.now() + "_" + randomSuffix`
+- Exercises: `"re_" + Date.now() + "_" + randomSuffix`
+
+This ensures no ID collisions between the template and any previously saved routines.
+
+## Common Template Patterns
+
+Here are the most widely used template structures coaches build in FocusFlow:
+
+<Accordion title="Push / Pull / Legs (3-day split)">
+  A classic hypertrophy split dividing the week by movement pattern. Typically run 2× per week (6 days) or 1× per week (3 days).
+
+  | Day | Focus |
+  |---|---|
+  | Day 1 – Push | Chest, anterior/lateral deltoids, triceps |
+  | Day 2 – Pull | Back (width + thickness), rear delts, biceps |
+  | Day 3 – Legs | Quads, hamstrings, glutes, calves |
+
+  In FocusFlow, create three days and populate each from the relevant catalog categories (Pecho + Hombros + Brazos for Push, Espalda + Brazos for Pull, Piernas for Legs).
+</Accordion>
+
+<Accordion title="Torso-Pierna / Upper-Lower (2-day split)">
+  A frequency-focused split that trains upper and lower body twice per week, ideal for intermediate athletes.
+
+  | Day | Focus |
+  |---|---|
+  | Day A – Upper (Heavy) | Horizontal push + pull, overhead press |
+  | Day B – Lower (Heavy) | Squat pattern, hip hinge |
+  | Day C – Upper (Volume) | Higher rep variations of Day A movements |
+  | Day D – Lower (Volume) | Higher rep variations of Day B movements |
+
+  The "optional" flag on days is useful here — mark Day C and Day D as optional for athletes who can only train 3 days per week.
+</Accordion>
+
+<Accordion title="Fullbody (2–3×/week)">
+  Full-body sessions hitting every major muscle group each training day. Best for beginners or athletes with limited training frequency.
+
+  | Day | Structure |
+  |---|---|
+  | Day A | Squat compound + Horizontal push + Horizontal pull + Accessory |
+  | Day B | Hip hinge compound + Vertical push + Vertical pull + Accessory |
+
+  Alternate Day A and Day B across the week. Use `globalRestSeconds: 180` as a starting rest period and `RPE 7–8` targets while the athlete builds work capacity.
+</Accordion>
+
+<Accordion title="Custom Splits">
+  FocusFlow's template editor places no constraints on day count or structure. Common custom splits include:
+
+  - **Bro Split (5-day):** Chest / Back / Shoulders / Arms / Legs
+  - **Conjugate / Westside-inspired:** Max Effort Upper, Max Effort Lower, Dynamic Upper, Dynamic Lower
+  - **Sport-specific periodization:** In-season maintenance blocks with reduced volume and 2–3 days/week
+  - **Corrective programs:** Mobility-first days with bodyweight movements at low RPE targets
+
+  Name each day clearly in the `RoutineDay.name` field so athletes understand the session focus at a glance.
+</Accordion>
+
+## Editing Templates
+
+You can modify any saved template at any time from the template gallery:
+
+1. Navigate to **Exercises & Templates → My Planned Templates**.
+2. Click **Modify** (pencil icon) on the template card.
+3. The TemplateHandmadeEditor opens pre-populated with the template's current data (a deep clone, so you're editing safely).
+4. Make changes to days, exercises, reps, or intensity values.
+5. Click **Save Modifications**.
+
+<Note>
+  **Template edits do not retroactively affect routines that have already been cloned to athletes.** Each clone is a fully independent copy stored under the athlete's profile. If you update a template after cloning it to several athletes, those athletes' routines remain unchanged — you would need to re-clone and re-apply the template if you want them to receive the updates.
+</Note>
+
+## Exporting Templates as PDF
+
+Any template can be exported as a formatted, print-ready HTML document using the `generateTemplateHTML()` function from `src/utils/exporters.ts`. This generates a professional-looking PDF with a branded header, coach name and email, and a day-by-day table of exercises.
+
+```typescript
+import { generateTemplateHTML } from "@/utils/exporters";
+
+const exportTemplateToPDF = (template: WorkoutTemplate, coach: User) => {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    alert("Please allow popups to export to PDF.");
+    return;
+  }
+
+  const htmlContent = generateTemplateHTML(
+    template,
+    coach.fullName,
+    coach.email
+  );
+
+  printWindow.document.write(htmlContent);
+  printWindow.document.close();
+  // window.print() is called automatically on load via the generated script tag
+};
+```
+
+The exported document includes:
+- A teal gradient header with the template name, description, coach name, coach email, and generation date.
+- One section per training day with a full exercise table (name, category, sets, reps, load, RPE/intensity, notes).
+- For exercises with `customized: true`, the reps column shows each set's individual `targetReps (targetRpe)` separated by `|` rather than a uniform rep range.
+- A print button and an auto-print trigger (`window.print()`) so the coach or athlete can save directly to PDF.
+
+<Tip>
+  In the template gallery, every template card has an **Export PDF** button (teal icon) that calls this function directly — no custom code needed. Use it to hand printed programs to athletes before a session or attach them to email check-ins.
+</Tip>

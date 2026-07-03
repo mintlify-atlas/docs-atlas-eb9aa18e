@@ -1,0 +1,264 @@
+---
+title: "Notification System: In-App and Browser Alerts"
+sidebarTitle: "Notifications"
+description: "How FocusFlow generates in-app notification badges, plays audio chimes, sends browser push notifications, and structures AppNotification objects."
+---
+
+FocusFlow provides a layered notification system that combines an in-app notification center, synthesised audio chimes via the Web Audio API, and native browser push notifications. Every notification originates from a call to `triggerNotification`, which simultaneously plays a chime, attempts a native push, and returns a structured `AppNotification` object ready to be persisted to `fit_notifications` in Firestore. All audio and browser notification functions degrade gracefully — they suppress errors silently when the necessary browser APIs are unavailable.
+
+---
+
+## AppNotification type
+
+Every notification displayed in FocusFlow's notification center conforms to this interface (defined in `src/types.ts`):
+
+```typescript
+export interface AppNotification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: "workout" | "review" | "message" | "general";
+  timestamp: string;   // ISO 8601 string
+  isRead: boolean;
+  linkTab?: "workout" | "calendar" | "progress" | "review" | "gallery"
+          | "chat"    | "profile"  | "athletes" | "templates" | "messages"
+          | "settings"| "reviews"  | "agenda"   | "billing"   | "summary"
+          | "exercises_menu";
+}
+```
+
+### Field reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Unique ID in the format `"notif_<timestamp>_<random>"`. |
+| `userId` | `string` | The `User.id` of the recipient — either a coach or a client. |
+| `title` | `string` | Short notification headline shown in the notification badge. |
+| `message` | `string` | Full body text of the notification. |
+| `type` | `"workout" \| "review" \| "message" \| "general"` | Controls the notification icon and colour in the UI. |
+| `timestamp` | `string` | ISO 8601 creation time, e.g. `"2025-06-10T14:32:00.000Z"`. |
+| `isRead` | `boolean` | `false` on creation; set to `true` when the user opens the notification center. |
+| `linkTab` | `string` (optional) | Dashboard tab to navigate to when the notification is tapped. |
+
+---
+
+## Notification types
+
+<Expandable title="workout">
+  Fired when a client starts or completes a workout session, or when the coach assigns a new routine. Typically links to the `"workout"` or `"summary"` tab.
+</Expandable>
+
+<Expandable title="review">
+  Fired when a client submits a new weekly check-in, or when a coach posts feedback on an existing review. Links to `"review"` or `"reviews"`.
+</Expandable>
+
+<Expandable title="message">
+  Fired when a new chat message arrives in the coach-athlete messaging thread. Links to `"chat"` or `"messages"`.
+</Expandable>
+
+<Expandable title="general">
+  System-level alerts: plan upgrades, payment reminders, agenda events, or any notification that does not fit the above categories.
+</Expandable>
+
+---
+
+## linkTab navigation
+
+When a user taps a notification, FocusFlow routes them to the tab named by `linkTab`. The value maps directly to a dashboard tab identifier. Both coach and client dashboards share the same identifier space:
+
+| linkTab value | Destination |
+|---------------|-------------|
+| `"workout"` | Active workout / workout mode |
+| `"calendar"` | Training calendar |
+| `"progress"` | Progress & weight charts |
+| `"review"` | Client check-in review form |
+| `"gallery"` | Progress photo gallery |
+| `"chat"` | Coach-athlete chat |
+| `"profile"` | User profile settings |
+| `"athletes"` | Coach's athlete roster |
+| `"templates"` | Workout template library |
+| `"messages"` | Coach messages list |
+| `"settings"` | App settings |
+| `"reviews"` | Coach review management |
+| `"agenda"` | Coaching agenda & calendar |
+| `"billing"` | Subscription & billing |
+| `"summary"` | Workout summary log |
+| `"exercises_menu"` | Exercise catalog |
+
+Omitting `linkTab` renders the notification as non-navigable — tapping it simply marks it as read.
+
+---
+
+## Audio notifications
+
+All audio synthesis happens synchronously inside a try/catch block. If the Web Audio API is unavailable or blocked, a warning is logged and the function returns silently without throwing.
+
+### `playNotificationSound`
+
+```typescript
+function playNotificationSound(): void
+```
+
+Synthesises a two-tone electronic chime using a single sine-wave oscillator. The frequency glides from **C5 (523.25 Hz)** up to **G5 (783.99 Hz)** over 150 ms, producing an upward "ding" sound. The amplitude envelope ramps up to 0.12 gain over 40 ms then decays exponentially to near-zero over 550 ms, giving the chime a total audible length of approximately 650 ms.
+
+Used automatically by `triggerNotification` for new messages and general alerts.
+
+```typescript
+import { playNotificationSound } from "@/lib/notifications";
+
+// Play manually (e.g. on message send confirmation)
+playNotificationSound();
+```
+
+<Note>
+  Browsers require a prior user gesture (click, keypress, etc.) before an `AudioContext` can be created. If the athlete has not yet interacted with the page, the chime will be silently suppressed and a console warning will be emitted. The notification itself is still created and stored normally.
+</Note>
+
+---
+
+### `playRestTimerEndSound`
+
+```typescript
+function playRestTimerEndSound(): void
+```
+
+Plays **3 short rapid beeps** spaced 180 ms apart, each at **A5 (880 Hz)** — a pure, clear pitch similar to a premium athletic stopwatch. Each beep has a 20 ms attack and a 100 ms exponential decay at 0.15 peak gain.
+
+In addition, if the app is running as a standalone PWA and the device supports it, a short double vibration pattern (`[100, 50, 100]`) is triggered via `navigator.vibrate`.
+
+Used exclusively by the workout mode rest timer when the countdown reaches zero.
+
+```typescript
+import { playRestTimerEndSound } from "@/lib/notifications";
+
+// Inside the rest timer countdown effect
+if (restSecondsRemaining === 0) {
+  playRestTimerEndSound();
+}
+```
+
+---
+
+## Browser push notifications
+
+### `requestNotificationPermission`
+
+```typescript
+async function requestNotificationPermission(): Promise<boolean>
+```
+
+Requests browser-level notification permission from the user. Should be called once after a meaningful user interaction (e.g. when the user first enables notifications in settings).
+
+**Returns** `Promise<boolean>`:
+- `true` if permission is `"granted"`.
+- `false` if permission is `"denied"`, if the `Notification` API is unsupported, or if the request throws.
+
+```typescript
+import { requestNotificationPermission } from "@/lib/notifications";
+
+const granted = await requestNotificationPermission();
+if (!granted) {
+  // Show in-app prompt explaining why notifications are useful
+}
+```
+
+<Warning>
+  Calling `requestNotificationPermission` inside a sandboxed `<iframe>` will silently return `false` — browsers do not allow iframes to request notification permission. The in-app notification center works independently of this permission.
+</Warning>
+
+---
+
+### `sendBrowserNotification`
+
+```typescript
+function sendBrowserNotification(title: string, body: string): void
+```
+
+Fires a native OS-level notification if `Notification.permission === "granted"`. Uses a standard athletic dumbbell icon and the tag `"fit-app-alert"` (duplicate tags replace the previous notification rather than stacking).
+
+<ParamField path="title" type="string" required>
+  The notification headline shown in the OS notification tray.
+</ParamField>
+
+<ParamField path="body" type="string" required>
+  The notification body text.
+</ParamField>
+
+When running inside a sandboxed iframe the function detects this via `window.self !== window.top`, logs an informational message, and skips the `new Notification()` call — the in-app slider notification handles display instead.
+
+Clicking the native notification calls `window.focus()` to bring the FocusFlow tab to the foreground.
+
+```typescript
+import { sendBrowserNotification } from "@/lib/notifications";
+
+sendBrowserNotification(
+  "Nueva revisión de Carlos",
+  "Carlos García ha enviado su check-in semanal."
+);
+```
+
+---
+
+## triggerNotification
+
+```typescript
+function triggerNotification(
+  userId: string,
+  title: string,
+  message: string,
+  type: AppNotification["type"],
+  linkTab?: AppNotification["linkTab"]
+): AppNotification
+```
+
+The primary entry point for creating notifications. Orchestrates all three notification channels in sequence and returns the new `AppNotification` object. The caller is responsible for adding the returned object to the `fit_notifications` array and persisting it via `saveToCloud`.
+
+<ParamField path="userId" type="string" required>
+  The `User.id` of the notification recipient.
+</ParamField>
+
+<ParamField path="title" type="string" required>
+  Short notification headline (also used as the native push title).
+</ParamField>
+
+<ParamField path="message" type="string" required>
+  Full notification body text (also used as the native push body).
+</ParamField>
+
+<ParamField path="type" type='"workout" | "review" | "message" | "general"' required>
+  Notification category. Controls UI presentation.
+</ParamField>
+
+<ParamField path="linkTab" type="string">
+  Optional dashboard tab to navigate to on tap. See the [linkTab navigation](#linktab-navigation) table above.
+</ParamField>
+
+**Returns** a fully constructed `AppNotification` with a unique `id`, `isRead: false`, and a fresh ISO timestamp.
+
+```typescript
+import { triggerNotification } from "@/lib/notifications";
+import { saveToCloud } from "@/lib/firebase";
+
+// Coach receives a new client check-in
+const notification = triggerNotification(
+  coachId,
+  "Nueva revisión recibida",
+  `${clientName} ha enviado su check-in semanal.`,
+  "review",
+  "reviews"
+);
+
+// Persist to Firestore
+const updated = [...existingNotifications, notification];
+await saveToCloud("fit_notifications", updated);
+```
+
+**Side effects:**
+1. Calls `playNotificationSound()` — synthesises the two-tone chime.
+2. Calls `sendBrowserNotification(title, message)` — fires a native OS push if permitted.
+3. Returns the new `AppNotification` object (does **not** auto-persist to Firestore).
+
+<Tip>
+  To send a silent notification (no chime, no native push) — for example when back-filling historical notifications on app load — construct the `AppNotification` object directly without calling `triggerNotification`.
+</Tip>

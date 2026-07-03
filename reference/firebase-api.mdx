@@ -1,0 +1,379 @@
+---
+title: "Firebase API Reference: Cloud Persistence Functions"
+sidebarTitle: "Firebase API"
+description: "Reference for FocusFlow's Firebase persistence layer: saveToCloud, loadFromCloud, loadAllFromCloud, syncOfflineDataToCloud, authentication helpers, and error handling."
+---
+
+FocusFlow's `src/lib/firebase.ts` exports the core persistence layer built on Firebase Firestore and Authentication. Every write is first committed to a local offline backup before hitting Firestore, enabling a fully offline-first experience — if the network is unavailable, data is queued in a **dirty set** and pushed to the cloud automatically the next time connectivity is restored. This reference documents every exported function and constant in the module.
+
+---
+
+## Core persistence functions
+
+### `saveToCloud`
+
+```typescript
+async function saveToCloud(key: string, data: any): Promise<boolean>
+```
+
+Persists a data payload to both a local offline backup and Firestore. The local write always happens first so no work is ever lost in airplane-mode scenarios.
+
+<ParamField path="key" type="string" required>
+  One of the 16 `SYNC_KEYS` (e.g. `"fit_users"`, `"fit_routines"`). Used as both the Firestore document ID under `coaching_data/` and the `localStorage` backup key prefix (`fit_offline_backup_<key>`).
+</ParamField>
+
+<ParamField path="data" type="any" required>
+  The value to persist. Serialized with `JSON.stringify` before writing to Firestore under a `payload` field.
+</ParamField>
+
+**Returns** `Promise<boolean>` — `true` when the Firestore write succeeds within the 10-second timeout; `false` when the write falls back to local storage only.
+
+**Behavior on failure:** if the Firestore write times out or fails (non-permission error), `key` is added to the `fit_cloud_dirty_keys` set in localStorage so it can be retried by `syncOfflineDataToCloud`. A permission error immediately throws via `handleFirestoreError`.
+
+```typescript
+const saved = await saveToCloud("fit_weight_logs", weightLogsMap);
+if (!saved) {
+  console.warn("Saved locally only — will sync when back online.");
+}
+```
+
+---
+
+### `loadFromCloud`
+
+```typescript
+async function loadFromCloud(key: string): Promise<any | null | undefined>
+```
+
+Reads a document from Firestore, reconciles it against the local offline backup, and keeps both copies in sync.
+
+<ParamField path="key" type="string" required>
+  The `SYNC_KEYS` key to load. Queries `coaching_data/<key>` in Firestore.
+</ParamField>
+
+**Returns:**
+- The reconciled data value (array, object, or primitive) on success.
+- `null` if the Firestore document does not exist and there is no local backup.
+- `undefined` on total failure (network error + no local backup).
+
+**Reconciliation:** after a successful Firestore read, `reconcileLocalAndCloud` is called. If the cloud and local copies differ, the merged result is silently pushed back to Firestore to keep the server up to date.
+
+**Fallback chain:**
+1. Attempt Firestore read (15-second timeout).
+2. On timeout/error: read `fit_offline_backup_<key>` from localStorage.
+3. On localStorage failure: return `undefined`.
+
+```typescript
+const reviews = await loadFromCloud("fit_reviews");
+// reviews is Review[] | null | undefined
+```
+
+---
+
+### `loadAllFromCloud`
+
+```typescript
+async function loadAllFromCloud(): Promise<Record<string, any>>
+```
+
+Loads all 16 `SYNC_KEYS` in parallel using `Promise.all`. This is the primary bootstrap call executed when the app initialises.
+
+**Returns** a `Record<string, any>` mapping each sync key to its loaded value. Keys that fail to load will be `undefined`.
+
+```typescript
+const data = await loadAllFromCloud();
+
+const users    = data["fit_users"];     // User[]
+const routines = data["fit_routines"];  // Routine[]
+const notifs   = data["fit_notifications"]; // AppNotification[]
+```
+
+<Note>
+  All 16 Firestore reads fire simultaneously. On a fresh install with an empty database every read resolves to `null`; FocusFlow treats that as an empty initial state.
+</Note>
+
+---
+
+### `syncOfflineDataToCloud`
+
+```typescript
+async function syncOfflineDataToCloud(): Promise<boolean>
+```
+
+Iterates every key in the dirty set, reads its local backup from localStorage, and calls `saveToCloud` for each. Designed to be called whenever the app detects that connectivity has been restored.
+
+**Returns** `true` if every pending key synced successfully; `false` if one or more keys failed.
+
+```typescript
+window.addEventListener("online", async () => {
+  const allSynced = await syncOfflineDataToCloud();
+  if (!allSynced) {
+    console.warn("Some keys could not be synced — will retry next time.");
+  }
+});
+```
+
+---
+
+### `getDirtyKeys`
+
+```typescript
+function getDirtyKeys(): Set<string>
+```
+
+Returns the current `Set<string>` of sync keys that have unsaved local changes not yet confirmed in Firestore. The set is read from the `fit_cloud_dirty_keys` entry in localStorage.
+
+```typescript
+const dirty = getDirtyKeys();
+console.log(`${dirty.size} key(s) pending cloud sync:`, [...dirty]);
+```
+
+---
+
+### `reconcileLocalAndCloud`
+
+```typescript
+function reconcileLocalAndCloud(key: string, cloudData: any, localData: any): any
+```
+
+Merges a Firestore read result with its local backup according to a deterministic strategy. Called internally by `loadFromCloud`.
+
+<ParamField path="key" type="string" required>
+  The sync key. Controls the merge strategy applied.
+</ParamField>
+
+<ParamField path="cloudData" type="any" required>
+  The data parsed from the Firestore `payload` field.
+</ParamField>
+
+<ParamField path="localData" type="any" required>
+  The data parsed from the `fit_offline_backup_<key>` localStorage entry.
+</ParamField>
+
+**Merge rules:**
+
+| Condition | Winner |
+|-----------|--------|
+| `key` is in the dirty set | `localData` (local uncommitted changes take priority) |
+| `key === "fit_reviews"` | Cloud structure wins, but `photos` and `feedbackPhotos` arrays are restored from the matching local `Review` object (photos are never persisted to Firestore) |
+| All other keys, clean state | `cloudData` |
+
+<Warning>
+  Photos (`Review.photos` and `Review.feedbackPhotos`) are intentionally **not** written to Firestore — they are kept in local storage only. `reconcileLocalAndCloud` restores them from the local backup after every cloud read.
+</Warning>
+
+---
+
+### `handleFirestoreError`
+
+```typescript
+function handleFirestoreError(
+  error: unknown,
+  operationType: OperationType,
+  path: string | null
+): never
+```
+
+Constructs a structured `FirestoreErrorInfo` object containing the raw error message, operation type, document path, and full Firebase Auth context of the current user, then throws it as a JSON-serialised `Error`. This function **always throws** — it never returns.
+
+<ParamField path="error" type="unknown" required>
+  The raw error caught from a Firestore call.
+</ParamField>
+
+<ParamField path="operationType" type="OperationType" required>
+  The `OperationType` enum value describing the failing operation.
+</ParamField>
+
+<ParamField path="path" type="string | null" required>
+  The Firestore document path that was being accessed, e.g. `"coaching_data/fit_users"`. Pass `null` if no specific path is available.
+</ParamField>
+
+<Expandable title="OperationType enum">
+
+```typescript
+export enum OperationType {
+  CREATE = "create",
+  UPDATE = "update",
+  DELETE = "delete",
+  LIST   = "list",
+  GET    = "get",
+  WRITE  = "write",
+}
+```
+
+</Expandable>
+
+<Expandable title="FirestoreErrorInfo shape">
+
+```typescript
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?:        string | null;
+    email?:         string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?:   boolean | null;
+    tenantId?:      string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?:      string | null;
+    }[];
+  };
+}
+```
+
+</Expandable>
+
+---
+
+## Authentication exports
+
+FocusFlow uses Firebase Anonymous Auth by default. Google OAuth is layered on top for features that require Drive or Sheets access (photo uploads, data exports).
+
+### `whenAuthReady`
+
+```typescript
+const whenAuthReady: Promise<void>
+```
+
+A `Promise<void>` that resolves once Firebase Auth has finished initialising — either by restoring a persisted user session or by completing anonymous sign-in. Await this before making any Firestore calls to ensure `auth.currentUser` is populated.
+
+```typescript
+import { whenAuthReady, loadAllFromCloud } from "./lib/firebase";
+
+await whenAuthReady;
+const state = await loadAllFromCloud();
+```
+
+---
+
+### `signInWithGoogleWorkspace`
+
+```typescript
+async function signInWithGoogleWorkspace(): Promise<string>
+```
+
+Opens a Google OAuth popup (requesting `spreadsheets.readonly` and `drive.file` scopes) and returns the access token. If a token is already cached in memory the popup is skipped and the cached value is returned immediately.
+
+**Returns** `Promise<string>` — the Google OAuth access token.
+
+**Throws** if the popup is blocked or the user cancels.
+
+---
+
+### `signInWithGoogleSheets`
+
+```typescript
+const signInWithGoogleSheets: typeof signInWithGoogleWorkspace
+```
+
+A named alias for `signInWithGoogleWorkspace`. Used in contexts where the intent is specifically spreadsheet access.
+
+---
+
+### `getGoogleAccessToken`
+
+```typescript
+function getGoogleAccessToken(): string | null
+```
+
+Returns the in-memory cached Google access token, or `null` if no Google sign-in has occurred yet in this session.
+
+---
+
+### `setGoogleAccessToken`
+
+```typescript
+function setGoogleAccessToken(token: string | null): void
+```
+
+Updates the in-memory cached Google access token. If a `subscribeToGoogleToken` callback has been registered, it is invoked immediately when a non-null token is set.
+
+<ParamField path="token" type="string | null" required>
+  The new token value, or `null` to clear it.
+</ParamField>
+
+---
+
+### `subscribeToGoogleToken`
+
+```typescript
+function subscribeToGoogleToken(callback: (token: string) => void): void
+```
+
+Registers a callback that fires whenever a new Google access token becomes available. If a token is already cached, the callback is invoked immediately.
+
+<ParamField path="callback" type="(token: string) => void" required>
+  Called with the token string once it is available.
+</ParamField>
+
+---
+
+### `logoutGoogleSync`
+
+```typescript
+async function logoutGoogleSync(): Promise<void>
+```
+
+Clears the in-memory cached Google access token. Does **not** sign the user out of Firebase Anonymous Auth — only the Google OAuth session is cleared.
+
+---
+
+## SYNC_KEYS constant
+
+```typescript
+const SYNC_KEYS: string[]
+```
+
+The ordered list of all 16 Firestore document keys managed by the persistence layer:
+
+```typescript
+export const SYNC_KEYS = [
+  "fit_users",
+  "fit_client_profiles",
+  "fit_coach_profiles",
+  "fit_exercises",
+  "fit_templates",
+  "fit_routines",
+  "fit_weight_logs",
+  "fit_measurements_logs",
+  "fit_plicometria_logs",
+  "fit_reviews",
+  "fit_messages",
+  "fit_agenda_events",
+  "fit_summaries",
+  "fit_client_calendar_schedule",
+  "fit_active_session",
+  "fit_notifications",
+];
+```
+
+Each string is simultaneously:
+- The Firestore document ID within the `coaching_data` collection.
+- The localStorage offline backup key suffix (`fit_offline_backup_<key>`).
+- A property key in the `Record<string, any>` returned by `loadAllFromCloud`.
+
+---
+
+## safeStorage
+
+Defined in `src/lib/storage.ts` and re-exported implicitly through firebase.ts internals.
+
+```typescript
+const safeStorage = {
+  getItem(key: string): string | null
+  setItem(key: string, value: string): void
+  removeItem(key: string): void
+  clear(): void
+}
+```
+
+A drop-in `localStorage` wrapper that falls back to an in-memory `Record<string, string>` when `window.localStorage` is unavailable or throws a `SecurityError` (common in sandboxed iframes and certain browser privacy modes).
+
+All four persistence functions in firebase.ts use `safeStorage` internally — you should prefer it over direct `localStorage` access anywhere else in the codebase for the same resilience.
+
+<Tip>
+  When running FocusFlow inside an embedded iframe (e.g. during development previews), `safeStorage` silently absorbs the `SecurityError` thrown by the browser and keeps all local state in memory. Refreshing the page will clear in-memory storage, but Firestore data remains intact.
+</Tip>

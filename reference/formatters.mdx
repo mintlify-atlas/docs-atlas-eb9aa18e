@@ -1,0 +1,248 @@
+---
+title: "Formatter Utilities: Time, Date, Weight, and Rest Display"
+sidebarTitle: "Formatters"
+description: "Reference for FocusFlow's formatting utility functions: formatTime, formatDate, formatWeight, formatRestSeconds, and generateTemplateHTML."
+---
+
+FocusFlow's formatting utilities (`src/utils/formatters.ts` and `src/utils/exporters.ts`) provide consistent, locale-aware display formatting across every surface of the application — workout timers, athlete progress charts, routine printouts, and coach dashboards all consume these same helpers to ensure a uniform visual language. All formatter functions are pure (no side effects) and safe to call with invalid or nullish input.
+
+---
+
+## formatTime
+
+```typescript
+function formatTime(secs: number): string
+```
+
+Converts a raw duration in seconds into a zero-padded `"MM:SS"` string. Used by the live workout session timer and the in-session rest countdown.
+
+<ParamField path="secs" type="number" required>
+  Total elapsed or remaining seconds. Must be a non-negative finite number. Values less than 0 or `NaN` return `"00:00"`.
+</ParamField>
+
+**Returns** a `string` in `"MM:SS"` format. There is no hour component — durations longer than 59:59 continue incrementing the minute portion (e.g. a 90-minute session displays as `"90:00"`).
+
+| Input | Output |
+|-------|--------|
+| `0` | `"00:00"` |
+| `9` | `"00:09"` |
+| `90` | `"01:30"` |
+| `3661` | `"61:01"` |
+| `-5` | `"00:00"` |
+| `NaN` | `"00:00"` |
+
+```typescript
+import { formatTime } from "@/utils/formatters";
+
+// Workout timer display
+const display = formatTime(elapsedSeconds); // "04:32"
+
+// Rest countdown
+const countdown = formatTime(restSecondsRemaining); // "01:30"
+```
+
+---
+
+## formatDate
+
+```typescript
+function formatDate(
+  date: Date | string | number,
+  options?: Intl.DateTimeFormatOptions
+): string
+```
+
+Formats a date value using the Spanish locale (`es-ES`) via `Intl.DateTimeFormat`. Accepts multiple input types so callers never need to construct a `Date` object manually.
+
+<ParamField path="date" type="Date | string | number" required>
+  The date to format. Accepts a `Date` object, an ISO 8601 string (e.g. `"2024-03-15"`), or a Unix timestamp in milliseconds.
+</ParamField>
+
+<ParamField path="options" type="Intl.DateTimeFormatOptions">
+  Optional `Intl.DateTimeFormatOptions` overrides. Defaults to `{ day: "numeric", month: "numeric", year: "numeric" }` when omitted.
+</ParamField>
+
+**Returns** a locale-formatted date string, or:
+- An **empty string** (`""`) for falsy input (e.g. `null`, `undefined`, `0`, `""`).
+- The result of `String(date)` when the input cannot be parsed as a valid date.
+
+| Input | Output (es-ES default) |
+|-------|------------------------|
+| `"2024-03-15"` | `"15/3/2024"` |
+| `new Date("2025-01-01")` | `"1/1/2025"` |
+| `1710460800000` | `"15/3/2024"` |
+| `""` | `""` |
+
+```typescript
+import { formatDate } from "@/utils/formatters";
+
+// Default numeric format
+formatDate("2024-03-15");              // "15/3/2024"
+
+// Custom long format
+formatDate("2024-03-15", {
+  day:   "numeric",
+  month: "long",
+  year:  "numeric",
+});
+// "15 de marzo de 2024"
+```
+
+<Tip>
+  For calendar headers and agenda views, pass `{ month: "long", year: "numeric" }` as `options` to get a full month name in Spanish, e.g. `"junio de 2025"`.
+</Tip>
+
+---
+
+## formatWeight
+
+```typescript
+function formatWeight(weight: number | string | undefined | null): string
+```
+
+Appends `" kg"` to a weight value and handles all edge cases that appear in athlete profiles and workout logs where weight may be missing or zero.
+
+<ParamField path="weight" type="number | string | undefined | null" required>
+  Weight in kilograms. Accepts a number, a numeric string (parsed with `parseFloat`), or any nullish / empty value.
+</ParamField>
+
+**Returns** `"<value> kg"` for valid positive numbers, or `"-"` for any of the following:
+- `undefined`
+- `null`
+- Empty string `""`
+- `0` or any non-positive number
+- `NaN` (including non-numeric strings)
+
+| Input | Output |
+|-------|--------|
+| `75.5` | `"75.5 kg"` |
+| `"82"` | `"82 kg"` |
+| `0` | `"-"` |
+| `null` | `"-"` |
+| `undefined` | `"-"` |
+| `""` | `"-"` |
+| `"abc"` | `"-"` |
+
+```typescript
+import { formatWeight } from "@/utils/formatters";
+
+// Athlete profile card
+<span>{formatWeight(clientProfile.currentWeight)}</span>
+
+// Workout log exercise row — weight may not be set yet
+<td>{formatWeight(exercise.expectedWeight)}</td>
+```
+
+---
+
+## formatRestSeconds
+
+```typescript
+function formatRestSeconds(secs: number | undefined | null): string
+```
+
+Formats a rest period duration into a concise human-readable Spanish string. Displays seconds-only for sub-minute values and a combined minutes/seconds form for longer durations.
+
+<ParamField path="secs" type="number | undefined | null" required>
+  Rest duration in seconds. Non-positive values and nullish inputs return `"-"`.
+</ParamField>
+
+**Returns** a formatted string, or `"-"` when input is `undefined`, `null`, `0`, or negative.
+
+| Input | Output |
+|-------|--------|
+| `30` | `"30 seg"` |
+| `45` | `"45 seg"` |
+| `60` | `"1 min"` |
+| `90` | `"1 min 30 seg"` |
+| `120` | `"2 min"` |
+| `150` | `"2 min 30 seg"` |
+| `0` | `"-"` |
+| `null` | `"-"` |
+| `undefined` | `"-"` |
+
+```typescript
+import { formatRestSeconds } from "@/utils/formatters";
+
+// Exercise row in routine editor
+<span>Descanso: {formatRestSeconds(exercise.restSeconds)}</span>
+// "Descanso: 1 min 30 seg"
+
+// Template preview card
+<td>{formatRestSeconds(template.globalRestSeconds)}</td>
+```
+
+---
+
+## generateTemplateHTML
+
+```typescript
+function generateTemplateHTML(
+  template: { name: string; description?: string; days: RoutineDay[] },
+  coachFullName: string,
+  coachEmail: string,
+  dateStr?: string
+): string
+```
+
+Generates a complete, self-contained HTML document string suitable for opening in a new browser tab and printing (or saving as PDF). Produces a table-based printout with coach branding, a gradient header card, and per-day exercise tables. Defined in `src/utils/exporters.ts` and shared by both the `ExercisesTab` (template preview) and the coach dashboard (routine export).
+
+<ParamField path="template" type="object" required>
+  The workout template or routine object to render.
+
+  <Expandable title="template fields">
+    <ParamField path="template.name" type="string" required>
+      Template title displayed in the header and HTML `<title>` tag.
+    </ParamField>
+    <ParamField path="template.description" type="string">
+      Optional subtitle shown in the header card. Defaults to `"Sin descripción proporcionada."`.
+    </ParamField>
+    <ParamField path="template.days" type="RoutineDay[]" required>
+      Array of training days, each containing an `exercises: RoutineExercise[]` array and optional `notes`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="coachFullName" type="string" required>
+  Coach's full name. Shown in the header card and the footer attribution line.
+</ParamField>
+
+<ParamField path="coachEmail" type="string" required>
+  Coach's email address. Shown alongside the name in the header card.
+</ParamField>
+
+<ParamField path="dateStr" type="string">
+  Optional date string displayed in the header. Defaults to `new Date().toLocaleDateString("es-ES")` (today's date in Spanish locale) if omitted.
+</ParamField>
+
+**Returns** a `string` containing a complete `<!DOCTYPE html>` document. The caller is responsible for opening it in a new tab:
+
+```typescript
+import { generateTemplateHTML } from "@/utils/exporters";
+
+const html = generateTemplateHTML(
+  template,
+  "Carlos García",
+  "carlos@focusflow.app"
+);
+
+const win = window.open("", "_blank");
+win?.document.write(html);
+win?.document.close();
+```
+
+**Exercise table columns per day:**
+
+| Column | Source field | Notes |
+|--------|-------------|-------|
+| EJERCICIO | `ex.name` | Numbered (1, 2, 3…) |
+| CATEGORÍA | `ex.category` | e.g. "Pecho", "Piernas" |
+| SERIES | `ex.setsCount` | Bold teal highlight |
+| REPS | `ex.repsText` / `ex.sets[].targetReps` | Per-set reps shown when `ex.customized === true` |
+| CARGA | `ex.expectedWeight` | Appends " kg"; shows "-" if absent |
+| RPE/INT | `ex.intensity` | Shows "Personalizado" for customised exercises |
+| INDICACIONES / NOTAS | `ex.notes` | Italic; shows "-" if absent |
+
+<Note>
+  The generated HTML includes an inline `<script>` that calls `window.print()` automatically 300 ms after the page loads, so the print dialog opens immediately when the tab is opened. A "🖨️ Imprimir / Guardar PDF" button is also rendered for manual re-trigger.
+</Note>

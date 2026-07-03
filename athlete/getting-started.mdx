@@ -1,0 +1,79 @@
+---
+title: "Getting Started as an Athlete in FocusFlow"
+sidebarTitle: "Getting Started"
+description: "Log in to FocusFlow as an athlete, complete the onboarding questionnaire, and navigate your personalized dashboard with workout, progress, and chat tabs."
+---
+
+Welcome to FocusFlow — the mobile-first training platform built for athletes who want total visibility over their workouts, body composition, and coach communication. Once your coach creates your account and assigns your first routine, you will land on the Athlete Dashboard: a streamlined, touch-optimized interface designed to be used directly on the gym floor, letting you log sets, track your body weight, send check-ins, and message your coach without ever leaving the app.
+
+## First Login & Onboarding Questionnaire
+
+The first time you sign in, FocusFlow checks whether `needsQuestionnaire: true` is set on your `User` profile. If it is, you will be prompted to complete a short intake form before accessing the dashboard. This data is stored as `QuestionnaireData` in your profile and gives your coach the baseline information they need to personalise your programme.
+
+The questionnaire collects the following fields:
+
+| Field | Description |
+|---|---|
+| `weight` | Current body weight in kilograms |
+| `height` | Height in centimetres |
+| `age` / `birthDate` | Age in years, or date of birth in `YYYY-MM-DD` format |
+| `biologicalSex` | `MALE` or `FEMALE` — used for body-composition formulas |
+| `sleepHours` | Average hours of sleep per night |
+| `stressLevel` | Perceived stress on a 1–5 scale (1 = low, 5 = very high) |
+| `digestionStatus` | Free-text descriptor such as `"Buena"` or `"Lenta"` |
+| `additionalNotes` | Optional free-text for anything else you want your coach to know |
+
+<Note>
+  You only see this questionnaire once. If you need to update any value after submitting, ask your coach to adjust it from the athlete profile page, or edit your details directly in the **Profile** tab.
+</Note>
+
+## Dashboard Tabs Overview
+
+After completing the questionnaire you are taken to the main dashboard. The navigation bar at the top contains seven tabs you will use throughout your training journey.
+
+<CardGroup cols={2}>
+  <Card title="Workout (Entrenar)" icon="dumbbell">
+    Shows today's scheduled training day from your assigned routine. Tap **Start Workout** to enter real-time active training mode where you log every set with weight and reps.
+  </Card>
+  <Card title="Calendar (Calendario)" icon="calendar">
+    Your weekly plan at a glance. Completed days are marked green, rest days show a recovery indicator, and upcoming days display the planned session name.
+  </Card>
+  <Card title="Progress (Mi Progreso)" icon="chart-line">
+    Log your daily fasting weight, enter body circumference measurements, and view interactive charts for weight trend, training volume, body measurements, and compliance rate.
+  </Card>
+  <Card title="Check-in (Revisión Semanal)" icon="clipboard-check">
+    Submit your weekly report to your coach: wellness scores, body measurements, a written comment, and up to three progress photos (Front, Side, Back).
+  </Card>
+  <Card title="Gallery (Galería)" icon="images">
+    A chronological private photo timeline showing every Front, Side, and Back photo you have submitted in past check-ins so you can compare your transformation over time.
+  </Card>
+  <Card title="Chat" icon="message-circle">
+    Direct messaging with your coach. Includes online presence indicator, typing detection, read receipts, and the full conversation history from day one.
+  </Card>
+  <Card title="Profile (Ajustes)" icon="user">
+    Edit your personal data, avatar, email, and target goal. This is also where you can install FocusFlow as a Progressive Web App (PWA) on your phone's home screen.
+  </Card>
+</CardGroup>
+
+## Profile Setup
+
+After your first login, open the **Profile** tab and make sure the following fields are filled in accurately. FocusFlow uses them to power plicometría (skinfold) calculations and to personalise your progress charts.
+
+<Steps>
+  <Step title="Biological Sex">
+    Set `biologicalSex` to `MALE` or `FEMALE`. This value is required for body-density and body-fat percentage formulas (Jackson–Pollock, Yuhasz, etc.).
+  </Step>
+  <Step title="Birth Date">
+    Enter your `birthDate` in `YYYY-MM-DD` format. Age is derived from this field and used in several composition protocols.
+  </Step>
+  <Step title="Current Weight & Height">
+    Confirm `currentWeight` (kg) and `currentHeight` (cm). These are the starting-point values visible to your coach on the athlete overview card.
+  </Step>
+  <Step title="Target Goal">
+    Fill in `targetGoal` with a short description such as `"Ganar masa muscular"` or `"Perder grasa"`. Your coach sees this when designing your routine and reviewing your check-ins.
+  </Step>
+</Steps>
+
+<Note>
+  Your coach assigns and activates your training routine. You will not see any workout content in the **Workout** tab until a `Routine` has been assigned and its `isActive` flag is set to `true`. If the tab appears empty after onboarding, reach out to your coach via the **Chat** tab.
+</Note>

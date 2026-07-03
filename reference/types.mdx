@@ -1,0 +1,734 @@
+---
+title: "TypeScript Types Reference: All FocusFlow Interfaces"
+sidebarTitle: "Types"
+description: "Complete reference for all TypeScript interfaces and types in FocusFlow: User, Routine, WorkoutSummary, Review, PlicometriaLog, AgendaEvent, and more."
+---
+
+All FocusFlow data structures are defined as TypeScript interfaces in `src/types.ts`. Every domain object — from user accounts and training routines to body-composition logs and in-app notifications — is fully typed so the compiler can catch shape mismatches at build time. This page documents every exported type in the order it appears in the source file.
+
+<Note>
+  All types are exported from `src/types.ts` and can be imported anywhere in the codebase with `import type { ... } from '../types'`.
+</Note>
+
+---
+
+## `UserRole`
+
+A union type alias that enumerates the three permission levels a FocusFlow account can hold.
+
+```typescript
+export type UserRole = "coach" | "client" | "admin";
+```
+
+| Value     | Description                                              |
+|-----------|----------------------------------------------------------|
+| `"coach"` | Personal trainer / gym coach with athlete management access |
+| `"client"` | Athlete account linked to a specific coach              |
+| `"admin"` | Platform administrator with global access                |
+
+---
+
+## `User`
+
+The root account object stored in Firestore. Represents every registered user regardless of role.
+
+```typescript
+export interface User {
+  id: string;
+  username: string;
+  passwordHash: string; // BCrypt simulator
+  isTemporaryPassword: boolean;
+  needsQuestionnaire: boolean;
+  fullName: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: UserRole;
+  avatarUrl?: string;
+  coachId?: string; // Links client to specific coach
+  isPaused?: boolean; // If true, the user (or their assigned clients) loses access
+  biologicalSex?: "MALE" | "FEMALE";
+  birthDate?: string; // YYYY-MM-DD
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Firestore document ID |
+| `username` | `string` | Unique login handle |
+| `passwordHash` | `string` | BCrypt-simulated password hash |
+| `isTemporaryPassword` | `boolean` | Forces password change on next login |
+| `needsQuestionnaire` | `boolean` | Whether the onboarding questionnaire is still pending |
+| `fullName` | `string` | Concatenated display name |
+| `role` | `UserRole` | Account permission level |
+| `coachId` | `string?` | For clients: the ID of their assigned coach |
+| `isPaused` | `boolean?` | Suspends access when `true` |
+| `biologicalSex` | `"MALE" \| "FEMALE"?` | Used by body-composition formulas |
+| `birthDate` | `string?` | Format: `YYYY-MM-DD` |
+
+---
+
+## `ClientProfile`
+
+Extended metadata for client accounts, covering training plan settings, payment state, and plicometry configuration. Stored as a separate Firestore document keyed by `clientId`.
+
+```typescript
+export interface ClientProfile {
+  clientId: string;
+  targetGoal: string;
+  currentWeight: number;
+  currentHeight: number;
+  routineComplianceRate: number; // Percentage
+  reviewPeriodDays: number; // 7, 14, 30
+  progressionStrategy: string; // e.g., "Doble progresión", "Lineal"
+  planType: string;
+  lastPaymentDate: string; // ISO String
+  requiredMeasurements?: string[];
+  evaluationUnlocked?: boolean;
+  nextExpirationDate?: string; // Edit-override format YYYY-MM-DD
+  renewalMode?: "auto" | "manual";
+  isPlicometriaEnabled?: boolean;
+  plicometriaProtocolId?: "3-fold" | "4-fold" | "7-fold" | "yuhasz" | "jackson_pollock_3" | "jackson_pollock_4" | "jackson_pollock_7";
+  biologicalSex?: "MALE" | "FEMALE";
+  birthDate?: string; // YYYY-MM-DD
+  coachNotes?: string;
+  coachTasks?: { id: string; text: string; completed: boolean }[];
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `clientId` | `string` | Matches the corresponding `User.id` |
+| `currentWeight` | `number` | Most recent weight in kg |
+| `currentHeight` | `number` | Height in cm |
+| `routineComplianceRate` | `number` | Percentage of sessions completed |
+| `reviewPeriodDays` | `number` | Review cadence: `7`, `14`, or `30` days |
+| `progressionStrategy` | `string` | e.g. `"Doble progresión"`, `"Lineal"` |
+| `nextExpirationDate` | `string?` | Coach-overridden plan expiry (`YYYY-MM-DD`) |
+| `renewalMode` | `"auto" \| "manual"?` | How the subscription renews |
+| `isPlicometriaEnabled` | `boolean?` | Enables the body-composition tracking module |
+| `plicometriaProtocolId` | `string?` | Which skinfold protocol to use |
+| `coachTasks` | `{ id, text, completed }[]?` | Coach's internal to-do list for this client |
+
+---
+
+## `QuestionnaireData`
+
+The health intake form completed by new clients during onboarding.
+
+```typescript
+export interface QuestionnaireData {
+  weight: number;
+  height: number;
+  age: number;
+  birthDate?: string;
+  biologicalSex?: "MALE" | "FEMALE";
+  sleepHours: number;
+  stressLevel: number; // 1 to 5
+  digestionStatus: string; // e.g. "Buena", "Lenta"
+  additionalNotes?: string;
+  completedAt: string;
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `weight` | `number` | Self-reported weight in kg |
+| `height` | `number` | Height in cm |
+| `stressLevel` | `number` | Subjective scale 1 (low) – 5 (high) |
+| `digestionStatus` | `string` | e.g. `"Buena"`, `"Lenta"` |
+| `completedAt` | `string` | ISO 8601 timestamp |
+
+---
+
+## `Exercise`
+
+A reusable exercise definition in the coach's exercise library.
+
+```typescript
+export interface Exercise {
+  id: string;
+  name: string;
+  category: string; // e.g., "Pecho", "Espalda", "Piernas", "Hombros", "Brazos", "Cardio"
+  description?: string;
+  coachId?: string; // Unique per coach
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Firestore document ID |
+| `name` | `string` | Display name of the exercise |
+| `category` | `string` | Muscle group or modality (e.g. `"Pecho"`, `"Cardio"`) |
+| `description` | `string?` | Optional coaching notes or technique cues |
+| `coachId` | `string?` | Scopes the exercise to a specific coach's library |
+
+---
+
+## `ExerciseSet`
+
+Represents a single set within a workout, capturing both the prescription and the athlete's actual performance.
+
+```typescript
+export interface ExerciseSet {
+  setIndex: number;
+  targetReps: string; // e.g. "8-10" or "12"
+  achievedReps?: number;
+  weightUsed?: number;
+  completed: boolean;
+  skipped: boolean;
+  targetRpe?: string; // e.g. "@6.0", "9", etc.
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `setIndex` | `number` | Zero-based position in the set list |
+| `targetReps` | `string` | Prescribed rep range, e.g. `"8-10"` |
+| `achievedReps` | `number?` | Actual reps completed by the athlete |
+| `weightUsed` | `number?` | Load used in kg |
+| `completed` | `boolean` | Whether the set was finished |
+| `skipped` | `boolean` | Whether the set was deliberately skipped |
+| `targetRpe` | `string?` | RPE/RIR target, e.g. `"@6.0"`, `"9"` |
+
+---
+
+## `RoutineExercise`
+
+An exercise entry inside a `RoutineDay`, combining the exercise definition reference with per-block prescriptions.
+
+```typescript
+export interface RoutineExercise {
+  id: string; // Unique within routine
+  exerciseId: string;
+  name: string;
+  category: string;
+  optional: boolean;
+  setsCount: number;
+  repsText: string;
+  intensity: string; // e.g. "RPE 8", "RIR 2"
+  expectedWeight: number; // expected starting weight in kg
+  notes: string;
+  sets: ExerciseSet[];
+  customized?: boolean;
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Unique within the parent routine |
+| `exerciseId` | `string` | Reference to the `Exercise` library entry |
+| `optional` | `boolean` | If `true`, the athlete can skip this exercise |
+| `setsCount` | `number` | Prescribed number of sets |
+| `repsText` | `string` | Prescribed rep scheme, e.g. `"3×10"` |
+| `intensity` | `string` | Load prescription, e.g. `"RPE 8"`, `"RIR 2"` |
+| `expectedWeight` | `number` | Suggested starting load in kg |
+| `sets` | `ExerciseSet[]` | One entry per prescribed set |
+| `customized` | `boolean?` | Marks athlete-modified prescriptions |
+
+---
+
+## `RoutineDay`
+
+A single training day within a `Routine`, grouping exercises under a label such as `"Lunes - Torso"`.
+
+```typescript
+export interface RoutineDay {
+  id: string;
+  name: string; // e.g., "Lunes - Torso", "Martes - Pierna"
+  notes?: string;
+  exercises: RoutineExercise[];
+  optional?: boolean;
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Unique within the parent routine |
+| `name` | `string` | Label shown in the training schedule |
+| `notes` | `string?` | Coach instructions for the session |
+| `exercises` | `RoutineExercise[]` | Ordered list of exercises for the day |
+| `optional` | `boolean?` | If `true`, the whole day can be skipped |
+
+---
+
+## `Routine`
+
+A complete training program assigned to a specific client, made up of multiple `RoutineDay` entries.
+
+```typescript
+export interface Routine {
+  id: string; // Client routine is usually unique per client
+  clientId: string;
+  name: string;
+  isActive: boolean; // Current active routine vs "Siguiente Rutina"
+  days: RoutineDay[];
+  assignedAt: string;
+  startDate?: string;
+  endDate?: string;
+  globalRestSeconds?: number;
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Firestore document ID |
+| `clientId` | `string` | Athlete this routine belongs to |
+| `isActive` | `boolean` | Distinguishes current from upcoming routine |
+| `days` | `RoutineDay[]` | Ordered training days |
+| `assignedAt` | `string` | ISO 8601 assignment timestamp |
+| `globalRestSeconds` | `number?` | Default rest timer applied to all sets |
+
+---
+
+## `ActiveWorkoutSession`
+
+Persists the in-progress state of a workout so sessions survive page refreshes or app restarts.
+
+```typescript
+export interface ActiveWorkoutSession {
+  clientId: string;
+  routineId: string;
+  dayId: string;
+  dayName: string;
+  startTime: string; // ISO 8601
+  isStarted: boolean;
+  isRestDay: boolean;
+  isPaused?: boolean;
+  elapsedSeconds?: number;
+  retroDate?: string;
+  exercises: {
+    [routineExerciseId: string]: ExerciseSet[];
+  };
+  exerciseNotes?: {
+    [routineExerciseId: string]: string;
+  };
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `startTime` | `string` | ISO 8601 — when the session clock began |
+| `isStarted` | `boolean` | Whether the athlete has tapped "Start" |
+| `isRestDay` | `boolean` | Marks passive recovery days |
+| `isPaused` | `boolean?` | Session clock paused state |
+| `elapsedSeconds` | `number?` | Accumulated session time in seconds |
+| `retroDate` | `string?` | Allows backdating a session to a past date |
+| `exercises` | `Record<string, ExerciseSet[]>` | Live set data keyed by `routineExerciseId` |
+| `exerciseNotes` | `Record<string, string>?` | Per-exercise notes entered mid-session |
+
+---
+
+## `WorkoutSummary`
+
+The immutable record created when a session is completed. Used for history, analytics, and coach review.
+
+```typescript
+export interface WorkoutSummary {
+  id: string;
+  clientId: string;
+  routineId: string;
+  dayId: string;
+  dayName: string;
+  date: string; // YYYY-MM-DD
+  timeSpentSeconds: number;
+  totalVolume: number; // Sum of reps * weight
+  completionRate: number; // Percentage
+  isRestDay: boolean;
+  notes?: string;
+  loggedExercises?: {
+    [routineExerciseId: string]: ExerciseSet[];
+  };
+  loggedExerciseDetails?: {
+    [routineExerciseId: string]: {
+      name: string;
+      category: string;
+      userNotes?: string;
+    };
+  };
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `date` | `string` | Session date (`YYYY-MM-DD`) |
+| `timeSpentSeconds` | `number` | Total elapsed workout time |
+| `totalVolume` | `number` | Sum of `reps × weight` across all sets |
+| `completionRate` | `number` | Percentage of prescribed sets completed |
+| `loggedExercises` | `Record<string, ExerciseSet[]>?` | Snapshot of all set data at completion |
+| `loggedExerciseDetails` | `Record<string, { name, category, userNotes? }>?` | Exercise metadata at time of logging |
+
+---
+
+## `DailyWeight`
+
+A single bodyweight measurement entry for tracking the athlete's weight over time.
+
+```typescript
+export interface DailyWeight {
+  date: string; // YYYY-MM-DD
+  value: number;
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `date` | `string` | Measurement date (`YYYY-MM-DD`) |
+| `value` | `number` | Bodyweight in kg |
+
+---
+
+## `PlicometriaLog`
+
+A complete skinfold assessment record, storing both the raw measurements and the computed body-composition values.
+
+```typescript
+export interface PlicometriaLog {
+  id: string;
+  clientId: string;
+  date: string; // YYYY-MM-DD
+  weight: number; // Peso actual (kg)
+  protocolId: "3-fold" | "4-fold" | "7-fold" | "yuhasz";
+
+  // Skinfolds in mm
+  pectoral?: number;
+  abdominal?: number;
+  musloAnterior?: number;
+  triceps?: number;
+  suprailiaco?: number;
+  biceps?: number;
+  subescapular?: number;
+  axilarMedio?: number;
+
+  // Calculated properties
+  sumaPliegues: number;
+  densidadCorporal: number;
+  porcentajeGrasa: number;
+  masaGrasa: number; // kg
+  masaMagra: number; // kg
+
+  createdBy: "coach" | "client";
+  createdAt: string; // ISO String
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `protocolId` | `string` | Skinfold protocol used for this log |
+| `weight` | `number` | Bodyweight at time of assessment (kg) |
+| `pectoral` … `axilarMedio` | `number?` | Individual skinfold measurements in mm |
+| `sumaPliegues` | `number` | Sum of all measured skinfolds (mm) |
+| `densidadCorporal` | `number` | Computed body density (g/cm³) |
+| `porcentajeGrasa` | `number` | Body fat percentage (clamped 2–60%) |
+| `masaGrasa` | `number` | Fat mass in kg |
+| `masaMagra` | `number` | Lean mass in kg |
+| `createdBy` | `"coach" \| "client"` | Who entered the data |
+
+<Tip>
+  See the [Plicometría Formulas reference](/reference/plicometria-formulas) for the exact mathematical derivation of `densidadCorporal` and `porcentajeGrasa`.
+</Tip>
+
+---
+
+## `BodyMeasurements`
+
+A full-body tape-measure snapshot. Fields are optional so coaches can record only the measurements relevant to each athlete's program.
+
+```typescript
+export interface BodyMeasurements {
+  date: string; // YYYY-MM-DD
+  cuello?: number;
+  hombros?: number;
+  pecho?: number; // Pecho/Tórax
+  bajoBusto?: number; // Contorno bajo el busto
+  brazoRelajado?: number; // Brazo relajado
+  brazoContraido?: number; // Brazo contraído
+  antebraco?: number; // Antebrazo
+  muneca?: number; // Muñeca
+  cintura?: number; // Cintura
+  cinturaUmbilical?: number; // Cintura umbilical
+  cadera?: number; // Cadera
+  gluteos?: number; // Glúteos
+  musloSuperior?: number; // Muslo superior
+  musloMedio?: number; // Muslo medio
+  gemelo?: number; // Gemelo
+  tobillo?: number; // Tobillo
+  peso?: number; // Peso
+
+  // Legacy fields for backwards compatibility
+  biceps?: number;
+  pierna?: number;
+  espalda?: number;
+}
+```
+
+<Expandable title="All measurement fields">
+
+| Field | Description |
+|-------|-------------|
+| `cuello` | Neck circumference (cm) |
+| `hombros` | Shoulder width (cm) |
+| `pecho` | Chest / thorax circumference (cm) |
+| `bajoBusto` | Under-bust circumference (cm) |
+| `brazoRelajado` | Relaxed arm circumference (cm) |
+| `brazoContraido` | Flexed arm circumference (cm) |
+| `antebraco` | Forearm circumference (cm) |
+| `muneca` | Wrist circumference (cm) |
+| `cintura` | Waist circumference (cm) |
+| `cinturaUmbilical` | Umbilical waist circumference (cm) |
+| `cadera` | Hip circumference (cm) |
+| `gluteos` | Glute circumference (cm) |
+| `musloSuperior` | Upper thigh circumference (cm) |
+| `musloMedio` | Mid-thigh circumference (cm) |
+| `gemelo` | Calf circumference (cm) |
+| `tobillo` | Ankle circumference (cm) |
+| `peso` | Bodyweight (kg) |
+| `biceps` | Legacy: bicep circumference (cm) |
+| `pierna` | Legacy: leg circumference (cm) |
+| `espalda` | Legacy: back width (cm) |
+
+</Expandable>
+
+---
+
+## `Review`
+
+A periodic progress check-in submitted by the client and reviewed by the coach, combining measurements, photos, and bilateral feedback.
+
+```typescript
+export interface Review {
+  id: string;
+  clientId: string;
+  clientName: string;
+  date: string; // YYYY-MM-DD
+  measurements: BodyMeasurements;
+  comment: string;
+  photos: string[]; // Mock dataUrls or system images
+  status: "pending" | "reviewed";
+  coachFeedback?: string;
+  feedbackPhotos?: string[]; // With annotated illustrations/arrows
+  driveFolderUrl?: string; // Link to Google Drive folder containing original files
+  reviewedAt?: string;
+  acknowledgedByClient: boolean;
+  workoutHistory?: WorkoutSummary[];
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `measurements` | `BodyMeasurements` | Tape measurements at time of review |
+| `photos` | `string[]` | Progress photo URLs |
+| `status` | `"pending" \| "reviewed"` | Coach action state |
+| `coachFeedback` | `string?` | Coach's written response |
+| `feedbackPhotos` | `string[]?` | Annotated images attached by the coach |
+| `driveFolderUrl` | `string?` | Link to the Google Drive folder with originals |
+| `acknowledgedByClient` | `boolean` | Client has seen the coach's feedback |
+| `workoutHistory` | `WorkoutSummary[]?` | Sessions logged during the review period |
+
+---
+
+## `Message`
+
+A single direct message exchanged between a coach and a client.
+
+```typescript
+export interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  timestamp: string; // ISO string
+  isRead: boolean;
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `senderId` | `string` | `User.id` of the message author |
+| `receiverId` | `string` | `User.id` of the recipient |
+| `content` | `string` | Message body |
+| `timestamp` | `string` | ISO 8601 send time |
+| `isRead` | `boolean` | Whether the recipient has opened the message |
+
+---
+
+## `WorkoutTemplate`
+
+A reusable routine skeleton that coaches can stamp out into client-specific `Routine` instances.
+
+```typescript
+export interface WorkoutTemplate {
+  id: string;
+  name: string;
+  description: string;
+  days: RoutineDay[];
+  globalRestSeconds?: number;
+  coachId?: string; // Unique per coach
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Firestore document ID |
+| `name` | `string` | Template display name |
+| `description` | `string` | Brief description of the program |
+| `days` | `RoutineDay[]` | Day-by-day training structure |
+| `globalRestSeconds` | `number?` | Default rest timer for generated routines |
+| `coachId` | `string?` | Scopes the template to a specific coach |
+
+---
+
+## `AgendaEventType`
+
+A union type alias enumerating the six supported calendar event categories.
+
+```typescript
+export type AgendaEventType =
+  | "review"
+  | "payment"
+  | "videocall"
+  | "call"
+  | "presential_training"
+  | "other";
+```
+
+| Value | Description |
+|-------|-------------|
+| `"review"` | Scheduled progress review session |
+| `"payment"` | Payment due or received |
+| `"videocall"` | Remote coaching call via video |
+| `"call"` | Voice or phone call |
+| `"presential_training"` | In-person training session |
+| `"other"` | Any other calendar note |
+
+---
+
+## `AgendaEvent`
+
+A calendar entry on the coach's agenda, representing any scheduled interaction with a client.
+
+```typescript
+export interface AgendaEvent {
+  id: string;
+  clientId: string;
+  clientName: string;
+  coachId: string;
+  type: AgendaEventType;
+  title: string;
+  date: string; // YYYY-MM-DD
+  time?: string; // HH:MM
+  notes?: string;
+  notified: boolean;
+  meetLink?: string;
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `clientId` | `string` | Associated client |
+| `coachId` | `string` | Owning coach |
+| `type` | `AgendaEventType` | Category of the event |
+| `date` | `string` | Event date (`YYYY-MM-DD`) |
+| `time` | `string?` | Start time (`HH:MM`) |
+| `notified` | `boolean` | Whether a reminder was sent |
+| `meetLink` | `string?` | Google Meet or video call URL |
+
+---
+
+## `CoachProfile`
+
+Subscription and monetisation settings for a coach's FocusFlow account.
+
+```typescript
+export interface CoachProfile {
+  coachId: string;
+  planName: "Bronce" | "Plata" | "Oro" | "Elite";
+  monthlyCost: number;
+  maxAthletes: number;
+  payoutRate: number;
+  platformCommission: number;
+  nextBillingDate: string;
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `planName` | `string` | Tier: `"Bronce"`, `"Plata"`, `"Oro"`, or `"Elite"` |
+| `monthlyCost` | `number` | Monthly charge in the platform's currency unit |
+| `maxAthletes` | `number` | Maximum concurrent active clients |
+| `payoutRate` | `number` | Coach's revenue share rate |
+| `platformCommission` | `number` | Platform's cut as a decimal or percentage |
+| `nextBillingDate` | `string` | ISO 8601 next charge date |
+
+---
+
+## `AppNotification`
+
+An in-app notification pushed to a user's notification centre.
+
+```typescript
+export interface AppNotification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: "workout" | "review" | "message" | "general";
+  timestamp: string;
+  isRead: boolean;
+  linkTab?: "workout" | "calendar" | "progress" | "review" | "gallery" | "chat" | "profile" | "athletes" | "templates" | "messages" | "settings" | "reviews" | "agenda" | "billing" | "summary" | "exercises_menu";
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `userId` | `string` | Recipient user ID |
+| `type` | `string` | Notification category |
+| `isRead` | `boolean` | Whether the user has dismissed it |
+| `linkTab` | `string?` | Deep-link target tab opened on tap |
+
+<Expandable title="All linkTab values">
+
+| Value | Navigates to |
+|-------|--------------|
+| `"workout"` | Active workout screen |
+| `"calendar"` | Training calendar |
+| `"progress"` | Progress tracking dashboard |
+| `"review"` | Review submission/feedback |
+| `"gallery"` | Photo gallery |
+| `"chat"` | Direct messages |
+| `"profile"` | User profile |
+| `"athletes"` | Coach's athlete roster |
+| `"templates"` | Workout template library |
+| `"messages"` | Message centre |
+| `"settings"` | App settings |
+| `"reviews"` | Reviews list |
+| `"agenda"` | Coach agenda calendar |
+| `"billing"` | Billing & subscription |
+| `"summary"` | Workout summary |
+| `"exercises_menu"` | Exercise library |
+
+</Expandable>
+
+---
+
+## `SubscriptionPlan`
+
+Describes a purchasable subscription plan available to clients.
+
+```typescript
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  price: number;
+  months: number;
+  description: string;
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Firestore document ID |
+| `name` | `string` | Plan display name |
+| `price` | `number` | Total price for the plan duration |
+| `months` | `number` | Plan duration in months |
+| `description` | `string` | Marketing copy shown to the client |

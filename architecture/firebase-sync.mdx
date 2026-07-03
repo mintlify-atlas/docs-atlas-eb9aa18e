@@ -1,0 +1,314 @@
+---
+title: "Offline-First Firebase Sync in FocusFlow"
+sidebarTitle: "Firebase Sync"
+description: "How FocusFlow persists data offline with dirty-key tracking, automatic cloud reconciliation, and transparent fallback to localStorage."
+---
+
+FocusFlow uses an offline-first approach to data persistence — every write is committed to `localStorage` before it is ever sent to Firestore. This means the app continues operating without interruption in low-connectivity or airplane-mode environments: athletes can log workouts at the gym, and coaches can update routines on the road, with the confidence that no data will be lost. When connectivity is restored, an automatic sync engine flushes all locally queued changes back to the cloud in the background.
+
+---
+
+## `safeStorage` — Hardened Local Storage
+
+The foundation of FocusFlow's offline capability is `safeStorage`, defined in `src/lib/storage.ts`. In certain browser environments (sandboxed iframes, private browsing with storage restrictions), accessing `window.localStorage` directly throws a `SecurityError`. `safeStorage` wraps every operation in a `try/catch` and falls back transparently to an in-memory `Record<string, string>` store, so the rest of the application never needs to handle storage exceptions.
+
+```typescript
+// src/lib/storage.ts
+const safeStorage = {
+  getItem(key: string): string | null
+  setItem(key: string, value: string): void
+  removeItem(key: string): void
+  clear(): void
+}
+```
+
+The priority order for each operation is:
+
+1. **Native `window.localStorage`** — used if available and accessible.
+2. **In-memory `memoryStorage` object** — used as a silent fallback if `localStorage` throws.
+
+<Note>
+  Data written to the in-memory fallback is ephemeral — it does not survive a page reload. In practice, this fallback is only reached inside sandboxed preview iframes; production users always benefit from persistent `localStorage`.
+</Note>
+
+---
+
+## Write Flow — `saveToCloud`
+
+Every state mutation in FocusFlow ultimately calls `saveToCloud`. The function guarantees a local write before attempting the network write, so data is never at risk even if Firestore is unreachable.
+
+```typescript
+// src/lib/firebase.ts
+saveToCloud(key: string, data: any): Promise<boolean>
+```
+
+<Steps>
+  <Step title="Local backup first">
+    The serialised payload is immediately written to `safeStorage` under the
+    key `fit_offline_backup_{key}`. This happens synchronously before any
+    network call, ensuring the write is durable even if the tab is closed
+    immediately after.
+
+    ```typescript
+    safeStorage.setItem("fit_offline_backup_" + key, JSON.stringify(data));
+    ```
+  </Step>
+  <Step title="Firestore write with timeout">
+    A `setDoc` call is issued to `coaching_data/{key}` with a **10-second
+    timeout** via `withTimeout`. The document payload is:
+
+    ```json
+    {
+      "payload": "<JSON string>",
+      "updatedAt": "<ISO timestamp>"
+    }
+    ```
+  </Step>
+  <Step title="Success path — clean dirty key">
+    On a successful Firestore write, the key is removed from the
+    `fit_cloud_dirty_keys` set in `safeStorage`. The function returns `true`.
+
+    ```typescript
+    const dirty = getDirtyKeys();
+    dirty.delete(key);
+    safeStorage.setItem("fit_cloud_dirty_keys", JSON.stringify([...dirty]));
+    ```
+  </Step>
+  <Step title="Failure path — mark dirty key">
+    On any Firestore error (timeout, network failure, or permission error),
+    the key is added to the dirty set so the sync engine can retry later.
+    The function returns `false`.
+
+    ```typescript
+    const dirty = getDirtyKeys();
+    dirty.add(key);
+    safeStorage.setItem("fit_cloud_dirty_keys", JSON.stringify([...dirty]));
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  If a Firestore error is classified as a **permission error** (the error message
+  contains `"permission"`, `"insufficient"`, or the code is `"permission-denied"`),
+  `saveToCloud` calls `handleFirestoreError` which throws immediately. Permission
+  errors are not retried — they indicate a configuration issue that must be resolved
+  at the Firebase console level.
+</Warning>
+
+---
+
+## Read Flow — `loadFromCloud`
+
+Reading data combines a Firestore fetch with local reconciliation to produce the most up-to-date merged result.
+
+```typescript
+// src/lib/firebase.ts
+loadFromCloud(key: string): Promise<any | null | undefined>
+```
+
+<Steps>
+  <Step title="Fetch from Firestore">
+    `getDoc` is called on `coaching_data/{key}` with a **15-second timeout**.
+    If the document exists, `payload` is JSON-parsed into `cloudData`. If the
+    document does not exist, `cloudData` is `null`.
+  </Step>
+  <Step title="Load local backup">
+    The local backup at `fit_offline_backup_{key}` is read from `safeStorage`
+    and JSON-parsed into `localBackup`.
+  </Step>
+  <Step title="Reconcile cloud and local">
+    `reconcileLocalAndCloud(key, cloudData, localBackup)` is called to
+    produce the authoritative merged result. See the
+    [Reconciliation Logic](#reconciliation-logic) section for the merge rules.
+  </Step>
+  <Step title="Push merged changes back to cloud">
+    If the reconciled result differs from the raw cloud data (after stripping
+    photo fields for `fit_reviews`), `saveToCloud` is called in the background
+    to push the merged local changes back to Firestore, keeping both stores
+    in sync.
+  </Step>
+  <Step title="Update local backup">
+    The reconciled result is written back to `fit_offline_backup_{key}` to
+    keep the local cache current.
+  </Step>
+  <Step title="Firestore error fallback">
+    If the Firestore fetch throws (offline, timeout, etc.), the function
+    falls back to returning the raw `localBackup` string parsed from
+    `safeStorage`. If no local backup exists, it returns `undefined`.
+  </Step>
+</Steps>
+
+---
+
+## Dirty Key Tracking
+
+The dirty key set is the bookkeeping mechanism that connects offline writes to the sync engine.
+
+```typescript
+// src/lib/firebase.ts
+getDirtyKeys(): Set<string>
+```
+
+`getDirtyKeys` reads the JSON array stored at `fit_cloud_dirty_keys` in `safeStorage` and returns it as a `Set<string>`. Dirty keys are string values from `SYNC_KEYS` — e.g. `"fit_routines"`, `"fit_reviews"` — that represent data written locally but not yet confirmed in Firestore.
+
+In `App.tsx`, the dirty key count is polled every **1,500 ms** via `setInterval` and also refreshed on `window storage` events:
+
+```typescript
+const dirty = getDirtyKeys();
+setDirtyKeysCount(dirty.size);
+```
+
+The header sync indicator badge reflects this count in real-time:
+
+| State | Indicator |
+|---|---|
+| `dirtyKeysCount > 0` | Amber pulsing — `N pendientes` |
+| Syncing in progress | Amber spinning — `Sincronizando...` |
+| All synced | Green — `Sincronizado` |
+| Offline | Red pulsing — `Sin conexión` |
+
+---
+
+## Offline Sync Engine — `syncOfflineDataToCloud`
+
+When the device comes back online or the user manually triggers a sync, `syncOfflineDataToCloud` flushes all queued writes.
+
+```typescript
+// src/lib/firebase.ts
+syncOfflineDataToCloud(): Promise<boolean>
+```
+
+<Steps>
+  <Step title="Read dirty key set">
+    `getDirtyKeys()` is called. If the set is empty, the function returns
+    `true` immediately — nothing to do.
+  </Step>
+  <Step title="Iterate and retry each key">
+    For each dirty key, the local backup is read from
+    `fit_offline_backup_{key}`. The JSON is parsed and passed to
+    `saveToCloud(key, parsed)`.
+  </Step>
+  <Step title="Remove key on success">
+    If `saveToCloud` returns `true`, the key is immediately removed from the
+    dirty set in `safeStorage` and the sync log is updated.
+
+    ```typescript
+    dirty.delete(key);
+    safeStorage.setItem("fit_cloud_dirty_keys", JSON.stringify([...dirty]));
+    ```
+  </Step>
+  <Step title="Return overall result">
+    Returns `true` if all dirty keys were successfully flushed, `false` if
+    any key failed (e.g. still offline). Failed keys remain in the dirty set
+    for the next sync attempt.
+  </Step>
+</Steps>
+
+`syncOfflineDataToCloud` is triggered in three ways:
+- **Automatic on reconnect** — `window.addEventListener("online", ...)` in `App.tsx`.
+- **Automatic on startup** — called once after initial mount if `navigator.onLine` is `true`.
+- **Manual by the user** — clicking the sync status badge in the app header calls `handleManualSync`.
+
+---
+
+## Reconciliation Logic
+
+`reconcileLocalAndCloud` decides which version of the data wins when both a cloud copy and a local backup exist.
+
+```typescript
+// src/lib/firebase.ts
+reconcileLocalAndCloud(key: string, cloudData: any, localData: any): any
+```
+
+The decision tree is:
+
+<Steps>
+  <Step title="Null guards">
+    If `localData` is absent, return `cloudData`. If `cloudData` is absent,
+    return `localData`.
+  </Step>
+  <Step title="Photo restoration for fit_reviews">
+    For the `fit_reviews` key specifically, photos are never stored in
+    Firestore (they are base64 data URLs that would exceed the 1 MiB document
+    limit). Before applying any other merge logic, the `photos` and
+    `feedbackPhotos` arrays from the local backup are restored into the
+    matching cloud review objects:
+
+    ```typescript
+    if (key === "fit_reviews" && Array.isArray(cloudData) && Array.isArray(localData)) {
+      cloudData = cloudData.map(cloudReview => {
+        const localMatch = localData.find(l => l.id === cloudReview.id);
+        if (localMatch) {
+          return {
+            ...cloudReview,
+            photos: localMatch.photos?.length > 0
+              ? localMatch.photos : cloudReview.photos,
+            feedbackPhotos: localMatch.feedbackPhotos?.length > 0
+              ? localMatch.feedbackPhotos : cloudReview.feedbackPhotos,
+          };
+        }
+        return cloudReview;
+      });
+    }
+    ```
+  </Step>
+  <Step title="Dirty key wins">
+    If `getDirtyKeys()` contains the key being reconciled, the local data
+    takes precedence — it represents a write that has not yet reached
+    Firestore and must not be overwritten by a stale cloud read.
+  </Step>
+  <Step title="Cloud wins">
+    If the key is not dirty, the cloud data (with photos restored) is
+    returned as the authoritative version.
+  </Step>
+</Steps>
+
+---
+
+## Authentication Flow
+
+FocusFlow's authentication is designed to never block application startup, even in environments where user sign-in is unavailable.
+
+<Steps>
+  <Step title="onAuthStateChanged listener registered">
+    `src/lib/firebase.ts` registers `onAuthStateChanged` immediately on
+    module load, before any component mounts.
+  </Step>
+  <Step title="Existing session restored">
+    If an existing Firebase user session is found, `whenAuthReady` resolves
+    immediately. The user may be a previously authenticated named user or a
+    previously created anonymous user.
+  </Step>
+  <Step title="No session — anonymous sign-in">
+    If no session exists, `signInAnonymously(auth)` is called. This creates a
+    persistent anonymous Firebase account that satisfies Firestore security
+    rules without requiring the user to provide credentials.
+  </Step>
+  <Step title="whenAuthReady resolves">
+    Regardless of the outcome of the anonymous sign-in attempt, `whenAuthReady`
+    resolves. `App.tsx` awaits this promise at the start of its `boot()`
+    function, so Firestore calls only begin after Auth is fully initialised.
+
+    ```typescript
+    // App.tsx boot()
+    await whenAuthReady;
+    const data = await loadAllFromCloud();
+    ```
+  </Step>
+  <Step title="Google OAuth for Workspace">
+    Coaches who use Google Drive photo storage or Sheets exports call
+    `signInWithGoogleWorkspace()`. This triggers a `signInWithPopup` flow
+    that returns a Google OAuth access token (with `drive.file` and
+    `spreadsheets.readonly` scopes). The token is cached in memory as
+    `cachedGoogleAccessToken` for the session duration.
+
+    ```typescript
+    const token = await signInWithGoogleWorkspace();
+    // token is a Google OAuth access_token string
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  The single-document-per-collection pattern — where all data for each entity type is serialised into one Firestore document under `coaching_data/{key}` — means that Firestore security rules can be written at the collection level without needing per-document granularity. Every read or write for a given `SYNC_KEY` targets exactly one document path (`coaching_data/fit_routines`, `coaching_data/fit_reviews`, etc.), which keeps rule authoring straightforward and Firestore read billing predictable.
+</Note>

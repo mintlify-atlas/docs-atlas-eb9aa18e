@@ -1,0 +1,231 @@
+---
+title: "Workout Math Utilities: 1RM and Volume Calculations"
+sidebarTitle: "Workout Math"
+description: "Reference for FocusFlow's workout math utilities: calculate1RM, getRMPercentage, and generateRMTable using Epley and Brzycki formulas."
+---
+
+FocusFlow's workout math utilities, located in `src/utils/workoutMath.ts`, provide pure functions for estimating one-rep maxima and generating percentage-based load tables. These functions power the in-app 1RM calculator and the progressive overload suggestions shown to both coaches and athletes during session planning.
+
+<Note>
+  All three functions are fully tree-shakeable exports. Import only the functions you need to keep client bundles lean.
+</Note>
+
+---
+
+## `calculate1RM`
+
+Calculates the estimated one-repetition maximum (1RM) from a sub-maximal lift using either the Epley or Brzycki formula. This is the foundational building block used by both `getRMPercentage` and `generateRMTable`.
+
+```typescript
+export function calculate1RM(
+  weight: number,
+  reps: number,
+  formula: 'epley' | 'brzycki' = 'epley'
+): number
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `weight` | `number` | Load lifted in kg (or lbs — unit is consistent throughout) |
+| `reps` | `number` | Number of repetitions performed at that load |
+| `formula` | `'epley' \| 'brzycki'` | Formula to use (defaults to `'epley'`) |
+
+### Return value
+
+The estimated 1RM rounded to **1 decimal place**. Returns `0` if `weight ≤ 0` or `reps ≤ 0`. Returns `weight` unchanged when `reps === 1` (the lift itself is the 1RM).
+
+### Formulas
+
+**Epley:**
+
+```text
+1RM = weight × (1 + reps / 30)
+```
+
+**Brzycki:**
+
+```text
+1RM = weight / (1.0278 − 0.0278 × reps)
+```
+
+<Note>
+  Brzycki's denominator approaches zero as reps approach 37. When `reps ≥ 37`, FocusFlow automatically falls back to the Epley formula to avoid a division-by-zero or negative result.
+</Note>
+
+### Usage example
+
+```typescript
+import { calculate1RM } from './utils/workoutMath';
+
+// Athlete lifted 80 kg for 5 reps
+const oneRM = calculate1RM(80, 5, 'epley');
+// => 93.3
+
+// Same lift using Brzycki
+const oneRMBrzycki = calculate1RM(80, 5, 'brzycki');
+// => 94.6
+
+// Edge cases
+calculate1RM(0, 5, 'epley');  // => 0  (invalid weight)
+calculate1RM(80, 1, 'epley'); // => 80 (single rep: already the 1RM)
+```
+
+---
+
+## `getRMPercentage`
+
+Calculates the target training load for a given percentage of a known 1RM. Use this to prescribe warm-up sets, back-off sets, or any intensity zone.
+
+```typescript
+export function getRMPercentage(
+  oneRM: number,
+  percentage: number
+): number
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `oneRM` | `number` | The athlete's one-rep max (from `calculate1RM` or a tested max) |
+| `percentage` | `number` | Desired intensity as a whole number (e.g. `80` for 80%) |
+
+### Return value
+
+`oneRM × (percentage / 100)`, rounded to **1 decimal place**. Returns `0` if either argument is `≤ 0`.
+
+### Usage example
+
+```typescript
+import { calculate1RM, getRMPercentage } from './utils/workoutMath';
+
+const oneRM = calculate1RM(80, 5, 'epley'); // 93.3
+
+// Target weight for an 80% intensity set
+const targetWeight = getRMPercentage(oneRM, 80);
+// => 74.6
+
+// Warm-up set at 60%
+const warmUp = getRMPercentage(oneRM, 60);
+// => 56.0
+```
+
+<Tip>
+  Pair `getRMPercentage` with the `intensity` field on `RoutineExercise` to auto-fill suggested weights when the coach prescribes a load as a percentage of the athlete's last tested 1RM.
+</Tip>
+
+---
+
+## `generateRMTable`
+
+Generates a full 12-entry repetition-maximum table from a single sub-maximal effort. Each entry maps a rep count (1–12) to the corresponding recommended weight and percentage of 1RM, using the standard strength-training percentage map.
+
+```typescript
+export function generateRMTable(
+  weight: number,
+  reps: number,
+  formula: 'epley' | 'brzycki' = 'epley'
+): { reps: number; weight: number; percentage: number }[]
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `weight` | `number` | Load used in the reference set |
+| `reps` | `number` | Reps performed at that load |
+| `formula` | `'epley' \| 'brzycki'` | Formula used to estimate the 1RM (defaults to `'epley'`) |
+
+### Return value
+
+An array of 12 objects `{ reps, weight, percentage }` covering rep counts 1 through 12. Returns an empty array `[]` if the computed 1RM is `≤ 0`.
+
+### Percentage map
+
+The function uses the following standard resistance-training percentage map:
+
+| Reps | % of 1RM |
+|------|----------|
+| 1    | 100%     |
+| 2    | 95%      |
+| 3    | 93%      |
+| 4    | 90%      |
+| 5    | 87%      |
+| 6    | 85%      |
+| 7    | 83%      |
+| 8    | 80%      |
+| 9    | 77%      |
+| 10   | 75%      |
+| 11   | 72%      |
+| 12   | 70%      |
+
+### Example output for a 100 kg 1RM
+
+When the estimated 1RM is **100 kg**, `generateRMTable` produces the following load table:
+
+| Reps | % of 1RM | Target Weight (kg) |
+|------|----------|--------------------|
+| 1    | 100%     | 100.0              |
+| 2    | 95%      | 95.0               |
+| 3    | 93%      | 93.0               |
+| 4    | 90%      | 90.0               |
+| 5    | 87%      | 87.0               |
+| 6    | 85%      | 85.0               |
+| 7    | 83%      | 83.0               |
+| 8    | 80%      | 80.0               |
+| 9    | 77%      | 77.0               |
+| 10   | 75%      | 75.0               |
+| 11   | 72%      | 72.0               |
+| 12   | 70%      | 70.0               |
+
+### Usage example
+
+```typescript
+import { generateRMTable } from './utils/workoutMath';
+
+// Athlete squatted 90 kg for 6 reps
+const table = generateRMTable(90, 6, 'epley');
+
+// table[0] => { reps: 1,  percentage: 100, weight: 105.9 }
+// table[4] => { reps: 5,  percentage: 87,  weight: 92.1  }
+// table[7] => { reps: 8,  percentage: 80,  weight: 84.7  }
+// table[11]=> { reps: 12, percentage: 70,  weight: 74.1  }
+```
+
+<Expandable title="Full source implementation">
+
+```typescript
+export function generateRMTable(
+  weight: number,
+  reps: number,
+  formula: 'epley' | 'brzycki' = 'epley'
+): { reps: number; weight: number; percentage: number }[] {
+  const oneRM = calculate1RM(weight, reps, formula);
+  if (oneRM <= 0) return [];
+
+  const repPctMap = [
+    { reps: 1,  percentage: 100 },
+    { reps: 2,  percentage: 95  },
+    { reps: 3,  percentage: 93  },
+    { reps: 4,  percentage: 90  },
+    { reps: 5,  percentage: 87  },
+    { reps: 6,  percentage: 85  },
+    { reps: 7,  percentage: 83  },
+    { reps: 8,  percentage: 80  },
+    { reps: 9,  percentage: 77  },
+    { reps: 10, percentage: 75  },
+    { reps: 11, percentage: 72  },
+    { reps: 12, percentage: 70  },
+  ];
+
+  return repPctMap.map((item) => ({
+    reps: item.reps,
+    percentage: item.percentage,
+    weight: Math.round(oneRM * (item.percentage / 100) * 10) / 10,
+  }));
+}
+```
+
+</Expandable>

@@ -1,0 +1,113 @@
+---
+title: "Configure FocusFlow: Firebase, OAuth, and Environment"
+sidebarTitle: "Configuration"
+description: "All environment variables, Firebase project setup, Google OAuth configuration, and Firestore security rules needed to run FocusFlow."
+---
+
+FocusFlow is configured through three surfaces that work together: the `.env` file holds secrets and runtime URLs, `firebase-applet-config.json` supplies the Firebase SDK with project credentials, and `firestore.rules` controls who can read and write data in Firestore. Understanding each surface will let you deploy FocusFlow to any environment — local dev, staging, or production Cloud Run.
+
+## Environment Variables
+
+FocusFlow reads the following variables from your `.env` file at build time (Vite exposes `VITE_*` prefixed variables to the browser) and at server runtime for the Express layer.
+
+<ParamField path="GEMINI_API_KEY" type="string" required>
+  Your Google AI Studio API key for Gemini. This key powers AI-assisted features in FocusFlow. In AI Studio deployments this value is automatically injected from the project's Secrets panel; in self-hosted setups you must supply it manually.
+</ParamField>
+
+<ParamField path="APP_URL" type="string" required>
+  The full URL where the FocusFlow app is hosted — for example `https://my-app.run.app` or `http://localhost:3000`. Used for OAuth redirect callbacks and any self-referential API endpoints. In AI Studio this is injected automatically as the Cloud Run service URL.
+</ParamField>
+
+<ParamField path="VITE_OAUTH_CLIENT_ID" type="string">
+  Your Google OAuth 2.0 client ID, used by `@react-oauth/google` to enable Google Workspace sign-in for Drive photo uploads and Sheets integration. If left empty, the Google sign-in button will not appear. See the [Google OAuth](#google-oauth) section below for required scopes.
+</ParamField>
+
+## Firebase Project Setup
+
+FocusFlow requires a Firebase project with two services enabled: Firestore Database (for all application data) and Authentication (for user identity). Follow these steps to create and configure your project.
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com) and click **Add project**.
+2. Give your project a name and complete the setup wizard. Billing is not required for development usage within free-tier limits.
+3. Navigate to **Build → Firestore Database** and click **Create database**. Select **Native mode** (not Datastore mode) and choose your preferred region.
+4. Navigate to **Build → Authentication → Sign-in method** and enable the following providers:
+   - **Anonymous** — required; FocusFlow falls back to anonymous auth automatically when no session exists.
+   - **Google** — required for Google Workspace photo upload and Sheets integration via `signInWithGoogleWorkspace()`.
+5. Navigate to **Project settings → General → Your apps** and click the **Web** icon to register a web app. After registration, copy the `firebaseConfig` object values into `firebase-applet-config.json` in the project root.
+
+## Firebase Config Shape
+
+The `firebase-applet-config.json` file is read at module initialization time inside `src/lib/firebase.ts`. All seven fields below are required; the file must be valid JSON.
+
+```json firebase-applet-config.json
+{
+  "projectId": "your-project-id",
+  "appId": "1:000000000000:web:xxxxxxxxxxxxxxxxxxxxxxxx",
+  "apiKey": "AIzaSy...",
+  "authDomain": "your-project-id.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "your-project-id.firebasestorage.app",
+  "messagingSenderId": "000000000000"
+}
+```
+
+| Field | Description |
+|---|---|
+| `projectId` | Your Firebase project ID (e.g. `my-gym-app`). |
+| `appId` | The app ID generated when you registered the web app. |
+| `apiKey` | The browser-safe API key from Firebase project settings. |
+| `authDomain` | OAuth redirect domain in the format `<projectId>.firebaseapp.com`. |
+| `firestoreDatabaseId` | The Firestore database instance name. Use `(default)` unless you created a named database. FocusFlow passes this directly to `getFirestore(app, firestoreDatabaseId)`. |
+| `storageBucket` | Your Cloud Storage bucket in the format `<projectId>.firebasestorage.app`. |
+| `messagingSenderId` | The numeric sender ID from your project's Cloud Messaging settings. |
+
+## Firestore Security Rules
+
+FocusFlow ships with a minimal rule set that grants full read and write access to any authenticated user — including anonymous sessions. Deploy these rules from the **Firestore → Rules** tab in the Firebase Console or via the Firebase CLI.
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+<Warning>
+  These rules allow **any authenticated user** to read and write **all documents** in your Firestore database. Because FocusFlow automatically signs users in anonymously when no session exists, anonymous sessions satisfy `request.auth != null` and can access all data. This is acceptable for development and single-tenant deployments but is not suitable for multi-tenant production environments. Tighten the rules to scope access by `request.auth.uid` or custom claims before deploying to a shared production database.
+</Warning>
+
+## Google OAuth
+
+FocusFlow uses Google Workspace sign-in for two features: uploading progress photos to Google Drive and reading Google Sheets data for import flows. The integration is handled by the `signInWithGoogleWorkspace()` function in `src/lib/firebase.ts`, which triggers a popup via `signInWithPopup` and caches the resulting access token in memory.
+
+The `GoogleAuthProvider` is configured with two OAuth scopes:
+
+| Scope | Purpose |
+|---|---|
+| `https://www.googleapis.com/auth/spreadsheets.readonly` | Read-only access to Google Sheets for data import. |
+| `https://www.googleapis.com/auth/drive.file` | Read/write access to files created by or opened with the app — used for progress photo uploads to Google Drive. |
+
+To configure Google OAuth:
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com) → **APIs & Services → Credentials**.
+2. Create an **OAuth 2.0 Client ID** of type **Web application**.
+3. Add your `APP_URL` (and `http://localhost:3000` for local development) to the list of **Authorized JavaScript origins**.
+4. Add your `APP_URL` callback path to **Authorized redirect URIs** if you use redirect-based flows.
+5. Copy the **Client ID** value into `VITE_OAUTH_CLIENT_ID` in your `.env` file.
+
+The `prompt: 'consent'` parameter is set on the provider, which ensures Google always requests fresh consent and returns an access token even when the user has previously authorized the app.
+
+## Available npm Scripts
+
+The following scripts are defined in `package.json` and cover the full development and production lifecycle.
+
+| Script | Command | Description |
+|---|---|---|
+| `dev` | `vite --port=3000 --host=0.0.0.0` | Start the Vite development server on port 3000, bound to all network interfaces. |
+| `build` | `vite build` | Compile and bundle the app for production output into `dist/`. |
+| `preview` | `vite preview` | Serve the production build locally for final verification before deploying. |
+| `clean` | `rm -rf dist server.js` | Delete the `dist/` directory and `server.js` to force a clean rebuild. |
+| `lint` | `tsc --noEmit` | Run the TypeScript compiler in check-only mode to surface type errors without emitting files. |

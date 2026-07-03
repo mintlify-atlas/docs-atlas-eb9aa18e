@@ -1,0 +1,49 @@
+---
+title: "Progress Photo Gallery: Visual Body Transformation Timeline"
+sidebarTitle: "Gallery"
+description: "Browse your chronological progress photo timeline in FocusFlow. Compare Front, Side, and Back photos across check-in dates to see your physical transformation."
+---
+
+The **Progress Gallery** is your private visual history of your physical transformation inside FocusFlow. Every time you submit a weekly check-in and attach progress photos, those images are automatically added to your gallery, building a chronological record that makes the changes to your body composition and muscle definition visible in a way that numbers and charts alone cannot capture. Seeing the actual difference between where you started and where you are today is one of the most powerful motivators in long-term training.
+
+## Gallery Contents
+
+The gallery is populated exclusively from photos uploaded through the **Weekly Check-in** (Revisión Semanal) form. Each check-in can contain up to three photos representing the standard body-composition angles. Only check-ins that include at least one photo appear as entries in the gallery.
+
+All entries are ordered **chronologically by check-in date**, oldest first, so you can scroll through your history in the order it happened.
+
+## Photo Views Per Entry
+
+Each gallery entry corresponds to a single check-in date and displays up to three photos:
+
+<CardGroup cols={3}>
+  <Card title="Front (Frontal)" icon="person">
+    Front-facing view. Shows the anterior side of the body — chest, abdomen, quads, and overall symmetry.
+  </Card>
+  <Card title="Side (Perfil)" icon="person-walking">
+    Side-profile view. Reveals posture, abdominal depth, glute development, and the relationship between the chest and stomach.
+  </Card>
+  <Card title="Back (Espalda)" icon="person-simple">
+    Rear-facing view. Highlights back width and thickness, glute development, hamstring separation, and overall posterior chain conditioning.
+  </Card>
+</CardGroup>
+
+If only one or two angles were uploaded for a particular check-in, only those slots are shown for that date. Empty slots are not displayed.
+
+## Comparing Photos Across Dates
+
+Scroll through the gallery entries to compare how your physique has changed between different check-in periods. Because every entry is labelled with its submission date, you can identify the timeframe of each visible change — whether that is after four weeks of a new routine, at the end of a cut phase, or following a period of muscle-building focus.
+
+<Tip>
+  For the clearest visual comparison, try to take your check-in photos under the same conditions each week: same lighting, same location, same time of day (ideally morning before eating), and the same body angle relative to the camera. Consistency in photo conditions makes the physical changes far easier to see.
+</Tip>
+
+## Privacy
+
+Your gallery is entirely private to you. No other athlete can view it. Your **coach** can see the photos you have submitted through the **Reviews** tab on their coach dashboard — but only the photos associated with each submitted check-in, not a standalone gallery view. If you prefer certain check-ins not to include photos, simply leave the photo slots empty when submitting.
+
+<Note>
+  Photos in the gallery are stored in your **browser's localStorage**, not in the Firebase cloud. This means they are tied to the specific browser and device you used when you submitted each check-in. Switching to a different device, using a different browser, or clearing your browser's site data will make previously saved photos invisible in the gallery, even though the check-in records themselves (dates, measurements, comments, and scores) remain safely stored in Firestore.
+
+  To preserve your photo history permanently across devices, enable the **Google Drive sync** toggle before submitting each weekly check-in. This uploads your photos to a linked Drive folder and stores a `driveFolderUrl` on the check-in record, giving you a permanent cloud backup you can access from any device.
+</Note>

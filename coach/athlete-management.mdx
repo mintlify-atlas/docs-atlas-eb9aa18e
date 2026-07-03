@@ -1,0 +1,199 @@
+---
+title: "Athlete Management: Profiles, Notes, and Progress Tabs"
+sidebarTitle: "Athletes"
+description: "Search and filter athletes by name or goal, open detailed athlete profiles with 8 sub-tabs covering notes, calendar, stats, routines, reviews, sessions, and plicometría."
+---
+
+The **Athletes** tab (Atletas) is the central management interface for every client you coach. It combines a searchable, filterable roster of all your athletes with a fully-featured client profile panel that opens inline below the list. Once you select an athlete, eight sub-tabs give you complete visibility into their training history, body composition data, communication notes, and assigned programming — all in one place, without switching contexts.
+
+## Athlete List
+
+The top section of the Athletes tab displays all clients linked to your account as interactive cards. Each card shows the athlete's full name, email address, and current training goal.
+
+**Searching and filtering:**
+
+- **Name search** — Type any part of a name or email into the search box. The filter is accent-insensitive: searching for `garcia` will match `García`. The matching logic normalizes Unicode diacritics using `NFD` decomposition before comparing, so accents, tildes, and capitalization never block a result.
+- **Subscription status filter** — Surface only active clients or paused (suspended) accounts.
+- **Training goal filter** — Narrow the list to athletes sharing a specific objective, such as fat loss, muscle gain, or body recomposition.
+
+The panel can be minimized with the **Collapse** toggle to maximize the detail view below when you are focused on a single athlete. A **Clear Selection** button resets the active athlete without collapsing the list.
+
+**Adding a new athlete:** Click **New Client** to open the registration wizard. Fill in first name, last name (and optional second surname), email, biological sex, primary training goal, progression strategy, and the body measurements you want the athlete to log. FocusFlow auto-generates a username and a temporary password from the athlete's name. Copy both credentials from the confirmation screen and send them directly to your client — they will be prompted to set a permanent password on first login.
+
+## Athlete Profile Sub-tabs
+
+Selecting an athlete from the list opens their full profile below the roster. The profile is organized into 8 sub-tabs:
+
+<AccordionGroup>
+  <Accordion title="Details (Ficha del Atleta)">
+    The Details sub-tab is the official biographical and training record for this athlete. It displays:
+
+    - **Contact info:** Full name, email address.
+    - **Demographics:** Biological sex (`MALE` / `FEMALE`), date of birth, and calculated age.
+    - **Biometrics:** Initial body weight (kg) and height (cm).
+    - **Training configuration:** Primary goal (`targetGoal`), active subscription plan (`planType`), check-in frequency (`reviewPeriodDays` — typically 7, 14, or 30 days), and progression strategy (`progressionStrategy`, e.g. *Doble progresión*, *Lineal*).
+    - **Renewal settings:** Automatic or manual renewal mode, and the next payment expiration date.
+    - **Required body measurements:** The list of circumferences the athlete must log in their weekly check-in (e.g. waist, hips, arms, calves).
+    - **Plicometría toggle:** An enable/disable switch that controls whether the skinfold measurement module (`isPlicometriaEnabled`) is visible for this athlete. When enabled, you can also select the default protocol (`plicometriaProtocolId`): Jackson-Pollock 3-fold, 4-fold, 7-fold, or Yuhasz.
+
+    Click **Edit Profile** to enter edit mode and modify any of these fields. Changes are saved to Firestore via `onUpdateClientProfile`.
+  </Accordion>
+
+  <Accordion title="Notes (Bloc de Notas)">
+    The Notes sub-tab is a **private** workspace visible only to you. Athletes never see this content. It is powered by the `CoachClientNotes` component and writes to two fields on `ClientProfile`:
+
+    **Free-text notes (`coachNotes`):**
+    A large textarea where you can record anything relevant to this athlete — injury history, nutritional observations, technique cues, motivational context, or long-term programming notes. Changes are auto-saved when you click away (on `onBlur`).
+
+    **Task checklist (`coachTasks`):**
+    A structured action list for this client. Each task is stored as `{ id: string; text: string; completed: boolean }`. You can:
+    - Add tasks with the inline input and the **+** button.
+    - Toggle completion by clicking the circle icon next to each task — it animates to a filled checkmark.
+    - Delete a task with the trash icon that appears on hover.
+
+    All changes to notes and tasks are persisted immediately to Firestore so your reminders survive page reloads.
+  </Accordion>
+
+  <Accordion title="Calendar">
+    The Calendar sub-tab renders the athlete's `CalendarView` component — the same interactive calendar the athlete sees in their own app, but viewed from your coach perspective.
+
+    The calendar offers two view modes toggled from the header:
+    - **Month view** — A full 6-row, 7-column grid with color-coded day cells.
+    - **Week view** — A focused 7-day strip that also shows individual exercises within scheduled days.
+
+    **Day cell color coding:**
+    - ✅ **Completed (color by workout type):** Days the athlete finished a workout are rendered with a theme-colored badge (amber for push, blue for pull, emerald for legs, etc.) and a completion percentage.
+    - 🔵 **Scheduled / Pending:** A workout is assigned to this day but has not yet been logged.
+    - 🔴 **Missed (past week):** A non-optional workout that was assigned but not completed in a past week.
+    - 🟠 **Optional / Missed:** An optional training day that was not completed.
+    - ⚫ **Rest day:** No assignment — the cell shows "Rest" text in hover state.
+
+    Summary metrics above the grid show total completed sessions, average compliance rate, total volume lifted (kg), and total days scheduled for this athlete.
+
+    You can also view Agenda events (calls, video sessions, payment deadlines) overlaid on the calendar cells for this athlete.
+  </Accordion>
+
+  <Accordion title="Stats (Estadísticas)">
+    The Stats sub-tab is powered by `AthleteStatsView` and renders a full analytical dashboard of this athlete's long-term progress. All charts are built with **Recharts** and are interactive — hover to inspect exact values on any data point.
+
+    **Available charts (sourced from `WorkoutSummary[]`, `DailyWeight[]`, and `BodyMeasurements[]`):**
+
+    | Chart | Type | Data Source | Description |
+    |---|---|---|---|
+    | Body weight trend | Area chart | `DailyWeight[]` | Fasting body weight (kg) plotted chronologically. |
+    | Training volume per session | Bar chart | `WorkoutSummary[]` | Total lifted volume (reps × weight, kg) per completed workout. |
+    | Body measurements | Line chart | `BodyMeasurements[]` | Circumference in cm for the selected site over time. |
+    | Compliance rate | KPI indicator | `ClientProfile.routineComplianceRate` | Percentage of planned sets actually completed and logged. |
+
+    **Measurement site selector:** A dropdown above the charts lets you pick which circumference to visualize on the line chart. Options are filtered to only the measurements configured as required for this athlete (`requiredMeasurements`). Selecting **"Mix all circumferences"** overlays all tracked sites simultaneously.
+
+    **Delta indicators:** Two summary tiles above the charts show the net change in body weight and the net change in the selected measurement site from the earliest to the most recent data point, color-coded green (favorable) or amber (unfavorable) depending on the athlete's goal.
+  </Accordion>
+
+  <Accordion title="Routines (Rutinas)">
+    The Routines sub-tab lists every routine currently assigned to this athlete and lets you build or modify programming directly.
+
+    **Routine list:**
+    - **Active routine** — The program the athlete is currently following. Displayed prominently with a blue accent. You can toggle individual training day blocks on/off, view exercises per day, and delete the active routine if you need to replace it.
+    - **Next routine** — An upcoming program already prepared and waiting to go live after the current block ends.
+
+    **Routine Builder:** Clicking **Open Routine Builder** launches the full `RoutineBuilder` component scoped to this athlete. Inside, you can:
+    - Name the routine and set start/end dates.
+    - Add training days (e.g. *Day A: Push*, *Day B: Pull*).
+    - Add exercises to each day from the exercise catalog (with accent-insensitive search and inline exercise creation).
+    - Configure sets, rep range, target RPE/RIR, suggested weight, and per-exercise notes for each movement.
+    - Load a pre-built template from your library to populate the routine instantly.
+    - Save as active or queue as the next block.
+
+    You can also save any finished routine back to the template library for reuse with other athletes.
+  </Accordion>
+
+  <Accordion title="Reviews">
+    The Reviews sub-tab shows the full chronological history of this athlete's weekly check-ins, rendered by `AthleteReviewsView`.
+
+    **Each check-in card contains:**
+    - **Date and status badge** — Pending (amber) or Evaluated (green), plus the date you submitted your feedback.
+    - **Athlete notes** — The athlete's written comments about how the week felt.
+    - **Reported measurements** — All body circumferences the athlete entered (displayed as a grid of `key: value cm` cells).
+    - **Progress photos** — Thumbnail images (front, side, back) the athlete uploaded. Click any thumbnail to open the full-size photo lightbox.
+    - **Completed sessions in this period** — A list of all workouts the athlete logged between this check-in and the previous one, with day name, date, duration, and compliance rate.
+    - **Your feedback panel** — Your written technical feedback, visible to the athlete in their portal once submitted. If the review is still pending, an inline form appears for you to type and submit feedback directly here (or from the centralized Reviews tab).
+
+    The oldest check-in is labeled **Initial Review** for easy reference. You can edit previously submitted feedback at any time using the edit icon, or permanently delete a check-in with the trash icon (requires confirmation).
+  </Accordion>
+
+  <Accordion title="Completed Sessions (Sesiones)">
+    The Completed Sessions sub-tab provides an exhaustive, scrollable log of every workout this athlete has finished since joining your program. Data is sourced from `WorkoutSummary[]` filtered to `clientId`.
+
+    **Each session entry shows:**
+    - Workout name and date (`YYYY-MM-DD`).
+    - Total time spent (formatted as minutes).
+    - Total volume lifted (kg, sum of reps × weight across all completed sets).
+    - Completion rate (percentage of planned sets actually performed).
+    - Per-exercise breakdown: exercise name, category, and a set-by-set table showing achieved reps, weight used, and whether each set was completed or skipped.
+    - Athlete free-text notes written during or after the session.
+
+    Sessions are sorted newest-first. This view is useful for spotting trends in an athlete's effort, detecting load drops that may indicate fatigue or demotivation, and providing context when writing check-in feedback.
+  </Accordion>
+
+  <Accordion title="Plicometría">
+    The Plicometría sub-tab is only visible when `isPlicometriaEnabled` is set to `true` on this athlete's profile. It provides a structured skinfold measurement log with automatic body composition calculations, rendered by `PlicometriaModule`.
+
+    **Supported protocols:**
+    - Jackson-Pollock 3-fold (sex-specific)
+    - Jackson-Pollock 4-fold
+    - Jackson-Pollock 7-fold
+    - Yuhasz
+
+    **Skinfold sites tracked (in mm):** Pectoral, Abdominal, Anterior thigh, Triceps, Suprailiac, Biceps, Subscapular, Mid-axillary.
+
+    Each log entry (`PlicometriaLog`) records the measurement date, current body weight, and the raw millimeter values for each relevant site. The system automatically calculates:
+    - **Sum of skinfolds** (mm)
+    - **Body density** (g/cm³, using the appropriate Jackson-Pollock or Yuhasz formula for the athlete's biological sex)
+    - **Body fat percentage** (%)
+    - **Fat mass** (kg)
+    - **Lean mass** (kg)
+
+    Results are plotted on interactive trend charts so you can track body composition changes over time, independent of the scale weight.
+  </Accordion>
+</AccordionGroup>
+
+## ClientProfile Type Reference
+
+The following TypeScript interface defines the key fields stored per athlete in Firestore. These fields drive most of the behavior described in the sub-tabs above.
+
+```typescript
+export interface ClientProfile {
+  clientId: string;                  // Links to User.id
+  targetGoal: string;                // e.g. "Fat loss / Body recomposition"
+  currentWeight: number;             // kg
+  currentHeight: number;             // cm
+  routineComplianceRate: number;     // Percentage, 0–100
+  reviewPeriodDays: number;          // Check-in cadence: 7, 14, or 30
+  progressionStrategy: string;       // e.g. "Doble progresión", "Linear"
+  planType: string;                  // e.g. "Mensual", "Trimestral"
+  lastPaymentDate: string;           // ISO date string
+  nextExpirationDate?: string;       // Override expiry (YYYY-MM-DD)
+  renewalMode?: "auto" | "manual";
+  requiredMeasurements?: string[];   // Body sites the athlete must log
+  biologicalSex?: "MALE" | "FEMALE";
+  birthDate?: string;                // YYYY-MM-DD
+  isPlicometriaEnabled?: boolean;    // Unlocks the Plicometría sub-tab
+  plicometriaProtocolId?:
+    | "jackson_pollock_3"
+    | "jackson_pollock_4"
+    | "jackson_pollock_7"
+    | "yuhasz";
+  coachNotes?: string;               // Private free-text notes (Notes tab)
+  coachTasks?: {                     // Private action checklist (Notes tab)
+    id: string;
+    text: string;
+    completed: boolean;
+  }[];
+  evaluationUnlocked?: boolean;
+}
+```
+
+<Note>
+  The `isPaused` flag lives on the `User` object (not on `ClientProfile`). When `isPaused` is `true`, the athlete loses all access to the FocusFlow client app — their login is blocked and they cannot log workouts, submit check-ins, or send messages. You can toggle this flag directly from the athlete's Details sub-tab. Use it to temporarily suspend access when a subscription lapses or a client takes a planned break, without deleting their data.
+</Note>

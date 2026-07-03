@@ -1,0 +1,146 @@
+---
+title: "Agenda and Calendar: Schedule and Track Events"
+sidebarTitle: "Agenda"
+description: "Schedule presential sessions, video calls, payment checkpoints, and reviews with individual athletes using FocusFlow's interactive monthly/weekly agenda."
+---
+
+The **Agenda** is FocusFlow's scheduling layer — the connective tissue between a coach's programme and an athlete's day-to-day calendar. Coaches use it to pin upcoming sessions, video consultations, payment due dates, and progress review windows directly to a visual monthly grid. Every event is tied to a specific athlete, time-stamped, and optionally annotated with a meet link or free-text notes. Athletes, in turn, see their own assigned sessions in their read-only **Calendar** tab, giving both parties a shared reference point without any back-and-forth on logistics.
+
+## Agenda Event Data Model
+
+Agenda events are modelled by the `AgendaEvent` interface and the `AgendaEventType` union:
+
+```typescript
+export type AgendaEventType =
+  | "review"
+  | "payment"
+  | "videocall"
+  | "call"
+  | "presential_training"
+  | "other";
+
+export interface AgendaEvent {
+  id: string;
+  clientId: string;
+  clientName: string;
+  coachId: string;
+  type: AgendaEventType;
+  title: string;
+  date: string;       // YYYY-MM-DD
+  time?: string;      // HH:MM (optional)
+  notes?: string;
+  notified: boolean;
+  meetLink?: string;
+}
+```
+
+| Field         | Description                                                                                    |
+| ------------- | ---------------------------------------------------------------------------------------------- |
+| `clientId`    | Links the event to a specific athlete (`User.id`).                                            |
+| `clientName`  | Denormalised athlete name for fast rendering without a secondary lookup.                       |
+| `coachId`     | The owning coach's `User.id`.                                                                  |
+| `type`        | One of the six `AgendaEventType` values — controls badge colour and UI label.                  |
+| `date`        | `YYYY-MM-DD` — the calendar day on which the event appears.                                   |
+| `time`        | Optional `HH:MM` timestamp displayed alongside the date in the list view.                     |
+| `notified`    | Set to `true` once the proximity notification has fired, preventing duplicate alerts.          |
+| `meetLink`    | Optional URL for video call events — rendered as a **"Unirse a Google Meet"** button.         |
+
+## Event Types
+
+Each `AgendaEventType` maps to a distinct colour dot in the calendar grid and a labelled badge in the list view:
+
+<CardGroup cols={2}>
+  <Card title="review 🗓️" icon="clipboard-check">
+    **Weekly check-in review session.** Used to schedule periodic progress evaluations where the athlete submits measurements and photos. Displayed in **amber** on the calendar grid.
+  </Card>
+  <Card title="payment 💳" icon="credit-card">
+    **Payment due or collection reminder.** Marks the date a subscription renewal is expected. Displayed in **emerald** on the calendar grid.
+  </Card>
+  <Card title="videocall 💻" icon="video">
+    **Remote video consultation.** Supports an optional `meetLink` field for a Google Meet or Zoom URL. The athlete can join directly from the event detail panel. Displayed in **violet** on the calendar grid.
+  </Card>
+  <Card title="call 📞" icon="phone">
+    **Phone call follow-up.** A lighter-touch touchpoint for quick verbal check-ins that don't require video. Displayed in **sky blue** on the calendar grid.
+  </Card>
+  <Card title="presential_training 🏋️" icon="dumbbell">
+    **In-person training session.** Records a face-to-face gym session between coach and athlete. Displayed in **blue** on the calendar grid.
+  </Card>
+  <Card title="other 📌" icon="calendar">
+    **Generic event.** A catch-all for anything that doesn't fit the above categories — admin tasks, nutrition consults, or assessment appointments. Displayed in **fuchsia** on the calendar grid.
+  </Card>
+</CardGroup>
+
+## Creating Events
+
+The Agenda tab contains a **quick-create form** in its left panel. Fill in the required fields and click **"Confirmar y Guardar Fecha"** to persist the event.
+
+<Steps>
+  <Step title="Select an athlete">
+    Choose the target athlete from the **Seleccionar Atleta** dropdown. This populates `clientId` and `clientName` on the saved event.
+  </Step>
+  <Step title="Choose an event type">
+    Pick the appropriate type from the **Tipo de Evento** dropdown. If you select **Videollamada**, an additional meet link field becomes relevant.
+  </Step>
+  <Step title="Enter a title">
+    Write a short, descriptive title in **Título del Evento** — for example, *"Videollamada mensual de análisis"* or *"Control antropométrico semana 8"*.
+  </Step>
+  <Step title="Add a meet link (optional)">
+    For video call events, paste a Google Meet or Zoom URL in the **Enlace de Google Meet** field, or click **"Generar Link Automático"** to create a placeholder meet link. The link is rendered as a clickable button in both the calendar detail panel and the list view.
+  </Step>
+  <Step title="Set date and time">
+    Pick the date using the date picker. The **Hora** field is optional — leave it blank for all-day reminders, or specify an `HH:MM` time for scheduled appointments.
+  </Step>
+  <Step title="Add notes (optional)">
+    Use the **Notas adicionales** textarea for any athlete-facing instructions — for example, *"Preparar fotos y tener a mano el peso promedio de la semana"*.
+  </Step>
+</Steps>
+
+## Calendar Views
+
+The Agenda tab offers two view modes, toggled from the **Modo de Vista de Agenda** selector bar:
+
+<CardGroup cols={2}>
+  <Card title="Calendar View 📅" icon="calendar-days">
+    A **monthly grid** showing all 7 weekdays. Each day cell displays colour-coded dots for every event scheduled on that day. Click any day to open a detail panel listing every event, its type badge, time, athlete name, meet link button, and notes. Use the **‹ ›** arrows to navigate between months, or press **Hoy** to jump back to the current month.
+  </Card>
+  <Card title="List View 📋" icon="list">
+    A **chronological card list** of all upcoming events (from today's date forward). Each card shows the event type badge, date and time, title, athlete name, optional notes block, and a Google Meet join link if present. Use this view when you want to scan your complete forward schedule at a glance.
+  </Card>
+</CardGroup>
+
+The calendar legend at the bottom of the monthly view maps each dot colour to its event type:
+
+| Colour   | Event Type            |
+| -------- | --------------------- |
+| 🟣 Violet  | Videollamadas         |
+| 🔵 Sky     | Llamadas              |
+| 🟡 Amber   | Revisiones            |
+| 🟢 Emerald | Pagos                 |
+| 🔵 Blue    | Presencial            |
+| 🩷 Fuchsia | Otros                 |
+
+## Proximity Alerts & Notifications
+
+When an event's date approaches, FocusFlow fires a notification using the `triggerNotification` function. The `notified` flag on the event is set to `true` after the first alert fires, preventing repeated notifications for the same event.
+
+```typescript
+triggerNotification(
+  coachId,
+  "Evento próximo",
+  `${event.title} con ${event.clientName} — ${event.date}`,
+  "general",
+  "agenda" // linkTab — navigates straight to the Agenda tab
+);
+```
+
+Upcoming events also surface on the **Resumen General** dashboard panel, giving coaches a bird's-eye view of the week's commitments alongside pending reviews and unread messages.
+
+## Coach vs. Athlete View
+
+<Accordion title="Coach — Full Scheduling Control">
+  The Agenda tab in the Coach Dashboard is a fully interactive scheduling tool. Coaches can create, update, and delete events for any athlete, switch between calendar and list views, and navigate between months freely.
+</Accordion>
+
+<Accordion title="Athlete — Read-Only Calendar">
+  Athletes see their own upcoming sessions in their **Calendar** tab. This view is read-only — athletes cannot create or delete events. Only events where `clientId` matches their own user ID are displayed, ensuring each athlete sees exactly what is relevant to them. The calendar gives athletes clear visibility into upcoming reviews, sessions, and payment dates without needing any direct communication.
+</Accordion>

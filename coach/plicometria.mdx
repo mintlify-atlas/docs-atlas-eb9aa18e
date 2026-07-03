@@ -1,0 +1,200 @@
+---
+title: "Plicometría: Body Composition Analysis for Athletes"
+sidebarTitle: "Plicometría"
+description: "Record and analyze skinfold measurements with Jackson-Pollock 3/4/7-fold, Durnin-Womersley, and Yuhasz protocols. FocusFlow calculates body fat %, lean mass, and fat mass automatically."
+---
+
+**Plicometría** is FocusFlow's integrated body composition measurement module. It lets coaches (and optionally athletes) record skinfold caliper readings in millimetres and receive instant, protocol-correct calculations of body density, body fat percentage, fat mass, and lean mass — all without leaving the platform. Measurements are plotted on interactive trend charts over time, making it easy to track body recomposition progress session-to-session. The module is built on four validated scientific protocols and is backed by the `computePlicometriaValues()` function in `src/lib/plicometria.ts`.
+
+## Enabling Plicometría
+
+Plicometría is **disabled by default** for all athletes. To activate it:
+
+<Steps>
+  <Step title="Open the athlete's profile">
+    Navigate to the athlete in your client list and select their profile.
+  </Step>
+  <Step title="Go to the Details sub-tab">
+    Open the **Ficha del Atleta** (Details) sub-tab and click **Editar Ficha** to enter edit mode.
+  </Step>
+  <Step title="Enable the toggle">
+    Turn on the `isPlicometriaEnabled` toggle on the `ClientProfile`. A `plicometriaProtocolId` selector will appear — choose the protocol to use for this athlete.
+  </Step>
+  <Step title="Set biological sex and birth date">
+    Plicometría formulas require **Sexo Biológico** (`biologicalSex`: `"MALE"` or `"FEMALE"`) and **Fecha de Nacimiento** (`birthDate`) to compute age-adjusted body density. If either is missing, a configuration warning banner is shown and form submission is blocked.
+  </Step>
+</Steps>
+
+<Warning>
+  If `biologicalSex` or `birthDate` is not set on the athlete's profile, FocusFlow will display a **Falta Configuración del Perfil** warning and disable the measurement entry form entirely. Always complete these fields before scheduling a plicometría session.
+</Warning>
+
+## Supported Protocols
+
+FocusFlow supports four evidence-based skinfold protocols. The protocol is selected per-athlete via `ClientProfile.plicometriaProtocolId` and controls which skinfold fields are shown in the entry form.
+
+<AccordionGroup>
+  <Accordion title="3-Fold — Jackson-Pollock">
+    The classic 3-site Jackson-Pollock protocol. Site selection is **sex-specific**.
+
+    | Sex | Sites |
+    |---|---|
+    | Male | Pectoral + Abdominal + Muslo anterior |
+    | Female | Tríceps + Suprailíaco + Muslo anterior |
+
+    **Formula (body density):**
+    - **Male:** `D = 1.10938 − 0.0008267×S + 0.0000016×S² − 0.0002574×age`
+    - **Female:** `D = 1.0994921 − 0.0009929×S + 0.0000023×S² − 0.0001392×age`
+
+    Where `S` = sum of the three skinfolds in mm. Body fat percentage is then derived using the **Siri formula**: `%fat = (4.95 / D − 4.5) × 100`.
+  </Accordion>
+
+  <Accordion title="4-Fold — Durnin-Womersley">
+    The 4-site Durnin-Womersley protocol. Applies to **all genders** with the same four sites.
+
+    **Sites (all):** Tríceps + Bíceps + Subescapular + Suprailíaco
+
+    **Formula:** `D = c − m × log₁₀(S)`
+
+    The coefficients `c` and `m` are selected from age group × sex lookup tables:
+
+    | Sex | Age | c | m |
+    |---|---|---|---|
+    | Male | < 20 | 1.162 | 0.063 |
+    | Male | 20–29 | 1.1631 | 0.0632 |
+    | Male | 30–39 | 1.1422 | 0.0544 |
+    | Male | 40–49 | 1.162 | 0.0700 |
+    | Male | ≥ 50 | 1.1715 | 0.0779 |
+    | Female | < 20 | 1.1549 | 0.0678 |
+    | Female | 20–29 | 1.1599 | 0.0717 |
+    | Female | 30–39 | 1.1423 | 0.0632 |
+    | Female | 40–49 | 1.1333 | 0.0612 |
+    | Female | ≥ 50 | 1.1339 | 0.0645 |
+
+    Age is calculated at the date of each measurement via `calculateAgeAtDate(birthDate, logDate)`. Body fat % is then computed with the **Siri formula**.
+  </Accordion>
+
+  <Accordion title="7-Fold — Jackson-Pollock">
+    The comprehensive 7-site Jackson-Pollock protocol. Uses the same sites for all genders but applies sex-specific polynomial formulas.
+
+    **Sites (all):** Pectoral + Axilar medio + Tríceps + Subescapular + Abdominal + Suprailíaco + Muslo anterior
+
+    **Formula (body density):**
+    - **Male:** `D = 1.112 − 0.00043499×S + 0.00000055×S² − 0.00028826×age`
+    - **Female:** `D = 1.097 − 0.00046971×S + 0.00000056×S² − 0.00012828×age`
+
+    Where `S` = sum of all seven skinfolds. Body fat % from the **Siri formula**.
+  </Accordion>
+
+  <Accordion title="Yuhasz (6-Fold)">
+    The Yuhasz protocol uses a **direct %fat formula** — it bypasses body density entirely.
+
+    **Sites (all):** Pectoral + Subescapular + Tríceps + Abdominal + Suprailíaco + Muslo anterior
+
+    **Formula (%fat direct):**
+    - **Male:** `%fat = 0.1051 × S + 2.585`
+    - **Female:** `%fat = 0.1548 × S + 3.58`
+
+    Where `S` = sum of all six skinfolds in mm. Because there is no intermediate density step, `densidadCorporal` is stored as the default value `1.0` for Yuhasz logs.
+  </Accordion>
+</AccordionGroup>
+
+## The `PlicometriaLog` Type
+
+Each measurement session is persisted as a `PlicometriaLog` document in Firestore:
+
+```typescript
+export interface PlicometriaLog {
+  id: string;
+  clientId: string;
+  date: string; // YYYY-MM-DD
+  weight: number; // kg
+  protocolId: "3-fold" | "4-fold" | "7-fold" | "yuhasz";
+
+  // Skinfolds in mm (only those required by the active protocol are populated)
+  pectoral?: number;
+  abdominal?: number;
+  musloAnterior?: number;
+  triceps?: number;
+  suprailiaco?: number;
+  biceps?: number;
+  subescapular?: number;
+  axilarMedio?: number;
+
+  // Calculated results (computed at save time by computePlicometriaValues())
+  sumaPliegues: number;
+  densidadCorporal: number;
+  porcentajeGrasa: number;
+  masaGrasa: number; // kg
+  masaMagra: number; // kg
+
+  createdBy: "coach" | "client";
+  createdAt: string; // ISO 8601
+}
+```
+
+Optional skinfold fields not required by the selected protocol are stored as `undefined` and excluded from the sum.
+
+## The `computePlicometriaValues()` Function
+
+All body composition arithmetic is centralised in a single pure function:
+
+```typescript
+import { computePlicometriaValues } from "@/lib/plicometria";
+
+const result = computePlicometriaValues({
+  weight: 78.5,
+  protocolId: "3-fold",
+  biologicalSex: "MALE",
+  age: 28,
+  pectoral: 12,
+  abdominal: 18,
+  musloAnterior: 14,
+});
+// → { sumaPliegues, densidadCorporal, porcentajeGrasa, masaGrasa, masaMagra }
+```
+
+For the full formula derivations, coefficient tables, and edge-case handling, see the [Plicometría Formulas Reference](/reference/plicometria-formulas).
+
+## Displayed Results
+
+After all skinfold values are entered, FocusFlow computes and shows results in real time (before saving) and stores them on the log record:
+
+<CardGroup cols={3}>
+  <Card title="Suma de Pliegues" icon="sigma">
+    `sumaPliegues` — total of all active skinfold sites, in **mm**. Displayed as an integer.
+  </Card>
+  <Card title="Densidad Corporal" icon="atom">
+    `densidadCorporal` — intermediate body density value (g/mL), displayed to 4 decimal places. Always `1.0` for Yuhasz.
+  </Card>
+  <Card title="Porcentaje Graso" icon="percent">
+    `porcentajeGrasa` — body fat percentage (%), displayed to 1 decimal place. Colour-coded amber in the UI.
+  </Card>
+  <Card title="Masa Grasa" icon="weight-scale">
+    `masaGrasa` — fat mass in **kg** (`weight × porcentajeGrasa / 100`). Displayed in red.
+  </Card>
+  <Card title="Masa Magra" icon="bolt">
+    `masaMagra` — lean mass in **kg** (`weight − masaGrasa`). Displayed in emerald.
+  </Card>
+</CardGroup>
+
+All five values are plotted on two interactive **Recharts** line charts:
+
+1. **Evolución de Composición Corporal** — overlays `Grasa %`, `Masa Magra (kg)`, and `Masa Grasa (kg)` on dual Y-axes over time.
+2. **Historial de Pliegues Cutáneos** — plots each individual skinfold site in mm over time, one coloured line per site.
+
+## Data Validation
+
+When entering a new measurement, FocusFlow compares each entered value against the most recent log. If any individual field deviates by **≥ 25%** from the previous reading, a validation warning is triggered:
+
+> *"Algún valor introducido varía mucho respecto a la última medición. Confirma que es correcto."*
+
+The coach must check an acknowledgement checkbox before the **Guardar Medición** submit button becomes active. This guards against accidental unit errors (e.g., entering centimetres instead of millimetres).
+
+<Note>
+  **%fat clamping:** After formula evaluation, `porcentajeGrasa` is always clamped between **2%** and **60%** with `Math.max(2, Math.min(60, porcentajeGrasa))`. This prevents physiologically impossible outputs caused by extreme skinfold combinations or data-entry errors from propagating into the stored log or trend charts.
+</Note>
+
+<Note>
+  **Who can enter measurements?** Both coaches and athletes can submit plicometría records — the `createdBy` field records `"coach"` or `"client"` accordingly. Coach-entered records are the authoritative measurement for progress reporting. Athlete-entered records are useful for self-tracking between scheduled sessions.
+</Note>

@@ -1,0 +1,101 @@
+---
+title: "Messaging: Real-Time Chat with Athletes"
+sidebarTitle: "Messaging"
+description: "FocusFlow's real-time chat connects coaches with each athlete. Features include online presence, typing indicators, read receipts, and full message history."
+---
+
+The **Messaging** tab is the direct communication channel between a coach and every athlete on their roster. From a single consolidated hub, coaches can see all active conversations in a sidebar, pick up any thread instantly, and exchange messages that are persisted in Firestore under the `fit_messages` collection. Whether a quick check-in before a session or a detailed form-check debrief after a review, every interaction stays in one organised place — no external apps required.
+
+## Message Data Model
+
+Each message exchanged in FocusFlow is represented by the `Message` interface:
+
+```typescript
+export interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  timestamp: string; // ISO string
+  isRead: boolean;
+}
+```
+
+| Field        | Description                                                    |
+| ------------ | -------------------------------------------------------------- |
+| `senderId`   | `User.id` of the author — either the coach or the athlete.    |
+| `receiverId` | `User.id` of the recipient.                                    |
+| `content`    | Plain-text message body.                                       |
+| `timestamp`  | ISO 8601 string written at send time.                         |
+| `isRead`     | `false` until the recipient opens the conversation thread.     |
+
+## Conversation List
+
+The chat sidebar renders one entry per athlete registered under the coach's account. Each entry shows:
+
+<CardGroup cols={2}>
+  <Card title="Online Indicator" icon="circle">
+    A green dot appears next to an athlete's name when they are **actively using the app** — displayed as **"En línea"** (Online). Offline athletes show a grey indicator.
+  </Card>
+  <Card title="Unread Badge" icon="bell">
+    A red badge showing the unread message count appears on any conversation with messages where `isRead: false` and `receiverId === coach.id`. The dashboard KPI card also surfaces the total **"Chats sin responder"** count.
+  </Card>
+</CardGroup>
+
+Clicking a conversation sets it as the active thread and automatically marks all incoming messages in that thread as read by calling `onMarkMessagesRead(clientId)`.
+
+## Real-Time Features
+
+<Accordion title="Online Presence">
+  FocusFlow tracks whether an athlete is currently active in the app. When an athlete's session is live, their conversation entry displays **"En línea"** next to their name. This lets coaches know the best time to reach out for quick session feedback.
+</Accordion>
+
+<Accordion title="Typing Indicator">
+  When either party is composing a reply, a **"Escribiendo..."** (Typing...) indicator appears in the active conversation header. This is triggered in real time via Firestore listener updates, giving both sides a natural conversational feel.
+</Accordion>
+
+<Accordion title="Read Receipts">
+  Once the recipient opens a message thread, all unread messages in that thread are marked `isRead: true`. The sender sees a double blue checkmark (**✓✓**) on delivered-and-read messages, giving coaches confidence that their instructions have been seen.
+</Accordion>
+
+## Message History
+
+All conversations are stored persistently in Firestore under the `fit_messages` collection. When a coach opens any conversation, the **full message history** is loaded — there is no pagination limit on the visible thread. This ensures coaches can always scroll back to reference previous guidance, agreed-upon plans, or athlete feedback without losing context.
+
+<Steps>
+  <Step title="Open the Chat tab">
+    Navigate to the **Chat** tab in the Coach Dashboard top navigation bar. The unread count badge is shown directly on the tab icon.
+  </Step>
+  <Step title="Select an athlete conversation">
+    Click any athlete entry in the conversation sidebar. The full thread loads immediately.
+  </Step>
+  <Step title="Send a message">
+    Type in the message input field at the bottom of the thread and press **Send** (or hit Enter). The message is written to Firestore and delivered in real time.
+  </Step>
+  <Step title="Read receipts update automatically">
+    As soon as the athlete opens the thread, `isRead` is set to `true` for all unread messages and the double blue checkmark appears on sent messages.
+  </Step>
+</Steps>
+
+## Notifications
+
+New incoming messages trigger both **in-app** and **browser push** notifications, using the `triggerNotification` function from `src/lib/notifications.ts`.
+
+```typescript
+triggerNotification(
+  userId,
+  title,
+  message,
+  "message",
+  "messages" // linkTab — navigates straight to the Chat tab
+);
+```
+
+The `AppNotification` produced carries `linkTab: "messages"`, so tapping the notification banner navigates directly to the chat thread. Notifications also:
+
+- Play an **audio chime** via the Web Audio API (`playNotificationSound`).
+- Fire a **browser push notification** (`sendBrowserNotification`) if the user has previously granted the `Notification` permission.
+
+<Tip>
+  Respond quickly to athletes' questions during active workout sessions — the athlete chat is accessible directly from their workout screen, so they may be messaging mid-set with a form question or a weight check. A prompt reply keeps their session momentum going.
+</Tip>

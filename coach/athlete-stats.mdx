@@ -1,0 +1,122 @@
+---
+title: "Athlete Statistics: Charts and Progress Analytics"
+sidebarTitle: "Stats"
+description: "Analyze athlete progress with interactive Recharts visualizations: body weight trends, training volume, body measurement history, and workout compliance rates."
+---
+
+The **Stats** sub-tab is the data-analysis layer of every athlete's profile in FocusFlow. It consolidates disparate data sources — daily weight logs, circumference measurements from check-ins, logged workout sessions, and compliance records — into a single **Evolución y Tendencias Estructurales** panel. Rather than hunting across multiple tabs, coaches get a unified, time-series view that makes trends, plateaus, and outliers immediately visible, enabling more precise programme adjustments.
+
+## Available Charts
+
+FocusFlow renders four distinct visualisations using **Recharts** inside `ProgressCharts`, driven by the `AthleteStatsView` component. All charts use `ResponsiveContainer` and display interactive hover tooltips.
+
+### Body Weight Evolution — *Evolución del Peso*
+
+<Card title="Area Chart" icon="chart-area">
+  **X-axis:** dates, sourced from `DailyWeight[].date` (sorted chronologically).  
+  **Y-axis:** weight in kilograms (`DailyWeight[].value`).
+
+  Plots the athlete's fasting morning body weight over time as a filled area chart. The delta from the first recorded entry to the most recent is surfaced in the **Variación de peso** indicator above the charts — displayed in emerald when the trend is negative (weight loss) and amber when positive.
+</Card>
+
+### Total Training Volume — *Volumen Total Levantado*
+
+<Card title="Bar Chart" icon="chart-bar">
+  **X-axis:** workout session dates (`WorkoutSummary[].date`).  
+  **Y-axis:** total volume in kilograms.
+
+  Each bar represents one logged workout session. Volume is the sum of completed sets × reps × weight across all exercises in that session, pre-computed and stored in `WorkoutSummary.totalVolume`. This chart makes it easy to identify deload weeks, injury periods, or spikes in workload.
+</Card>
+
+### Body Measurements — *Medidas Corporales*
+
+<Card title="Line Chart with Site Selector" icon="ruler">
+  **X-axis:** measurement dates, sourced from `BodyMeasurements[].date` (from Reviews).  
+  **Y-axis:** circumference in centimetres.
+
+  A dropdown above the chart lets the coach select which body site to plot. The selector is pre-filtered to only show measurement sites that are enabled in the athlete's `ClientProfile.requiredMeasurements`. Available sites include:
+
+  | `value` | Label |
+  |---|---|
+  | `todos` | Mix all circumferences |
+  | `cintura` | Waist |
+  | `cinturaUmbilical` | Umbilical waist |
+  | `cadera` | Hip |
+  | `pecho` | Chest / Thorax |
+  | `brazoContraido` | Flexed arm |
+  | `musloMedio` | Mid-thigh |
+  | `gemelo` | Calf |
+  | … | (full list in `BodyMeasurements`) |
+
+  The **Variación de perímetro** delta indicator updates dynamically to reflect whichever site is selected, comparing the earliest and latest logged values.
+</Card>
+
+### Compliance Rate — *Porcentaje de Cumplimiento*
+
+<Card title="Percentage Indicator" icon="percent">
+  A single-figure compliance metric sourced from `WorkoutSummary.completionRate` and stored on `ClientProfile.routineComplianceRate`. Represents the ratio of completed sets (achieved) to the total planned sets (`setsCount × routineExercises`) across the athlete's logged history.
+</Card>
+
+## Data Sources
+
+The table below maps each visualisation to the underlying Firestore collection and TypeScript type.
+
+| Chart | Type | Firestore Collection |
+|---|---|---|
+| Body Weight Evolution | `DailyWeight[]` | `fit_weight_logs` |
+| Total Training Volume | `WorkoutSummary[]` | `fit_summaries` |
+| Body Measurements | `BodyMeasurements[]` (from Reviews) | `fit_measurements_logs` |
+| Compliance Rate | `WorkoutSummary.completionRate` | `fit_summaries` |
+
+`AthleteStatsView` receives these as props keyed by `clientId`:
+
+```typescript
+interface AthleteStatsViewProps {
+  targetCli: User;
+  weightLogs: Record<string, DailyWeight[]>;
+  measurementsLogs: Record<string, BodyMeasurements[]>;
+  profiles: ClientProfile[];
+  summaries: WorkoutSummary[];
+}
+```
+
+Before passing data to `ProgressCharts`, both weight logs and measurement logs are sorted ascending by date so charts always plot left-to-right chronologically.
+
+## Chart Library
+
+All charts are rendered with **[Recharts](https://recharts.org/)**, a composable React charting library built on SVG. Key properties used throughout FocusFlow's stats panel:
+
+<CardGroup cols={2}>
+  <Card title="ResponsiveContainer" icon="expand">
+    Every chart fills its parent container width at 100%, making the layout fully responsive across desktop and tablet breakpoints.
+  </Card>
+  <Card title="Hover Tooltips" icon="cursor-arrow-rays">
+    `<Tooltip>` with a dark theme (`backgroundColor: "#020617"`) is enabled on all charts. Hovering any data point reveals the exact value and date.
+  </Card>
+  <Card title="Interactive Legends" icon="list">
+    `<Legend>` components allow toggling individual data series on and off for multi-line charts (e.g. the measurements chart in `todos` mode).
+  </Card>
+  <Card title="Dual Y-Axes" icon="arrows-up-down">
+    Some charts (like the plicometría composition chart) use dual Y-axes (`yAxisId="left"` / `"right"`) to overlay series with different scales.
+  </Card>
+</CardGroup>
+
+## Completed Sessions Log
+
+Below the chart panel, the Stats sub-tab renders a scrollable log of all completed workout sessions for the selected athlete. Each session card shows:
+
+<Steps>
+  <Step title="Session header">
+    **Date** (`WorkoutSummary.date`) and **Day name** (`dayName`, e.g. "Lunes - Torso"), with time spent displayed as `Math.round(timeSpentSeconds / 60)` minutes.
+  </Step>
+  <Step title="Exercise breakdown">
+    Every logged exercise from `loggedExercises` with its name, category, and set-by-set breakdown: target reps, achieved reps, weight used, and completion flag.
+  </Step>
+  <Step title="Session totals">
+    **Total volume** (`totalVolume` kg) and **completion rate** (`completionRate` %) for the entire session, colour-coded: ≥ 80% emerald, ≥ 50% amber, < 50% rose.
+  </Step>
+</Steps>
+
+<Tip>
+  Compliance rate is calculated as the ratio of **completed sets** (`achieved`) to **total planned sets** (`setsCount` × number of `routineExercises`). A rate above **90%** consistently indicates strong training adherence and is a reliable signal that the athlete is ready for progressive overload. Rates below **50%** warrant a conversation about recovery, motivation, or programme difficulty.
+</Tip>

@@ -1,0 +1,393 @@
+---
+title: "Plicometría Formulas: Body Composition Calculation Reference"
+sidebarTitle: "Plicometría Formulas"
+description: "Mathematical reference for FocusFlow's body composition protocols: Jackson-Pollock 3/4/7-fold, Durnin-Womersley, Yuhasz, and Siri body density formulas."
+---
+
+FocusFlow implements four validated skinfold protocols in `src/lib/plicometria.ts`. This page documents the exact mathematical formulas, site selections, and coefficient tables used by `computePlicometriaValues()` to transform raw millimetre measurements into actionable body-composition metrics. All results are stored in a [`PlicometriaLog`](/reference/types#plicometrialog) document in Firestore.
+
+<Note>
+  All formulas assume skinfold measurements in **millimetres (mm)** and bodyweight in **kilograms (kg)**. Body density is expressed in **g/cm³**.
+</Note>
+
+---
+
+## `computePlicometriaValues`
+
+The main computation function. It accepts raw skinfold inputs and returns the five derived body-composition values. The correct sub-formula is selected automatically based on `protocolId` and `biologicalSex`.
+
+```typescript
+export function computePlicometriaValues(params: {
+  weight: number;
+  protocolId: "3-fold" | "4-fold" | "7-fold" | "yuhasz";
+  biologicalSex: "MALE" | "FEMALE";
+  age: number;
+  pectoral?: number;
+  abdominal?: number;
+  musloAnterior?: number;
+  triceps?: number;
+  suprailiaco?: number;
+  biceps?: number;
+  subescapular?: number;
+  axilarMedio?: number;
+}): {
+  sumaPliegues: number;
+  densidadCorporal: number;
+  porcentajeGrasa: number;
+  masaGrasa: number;
+  masaMagra: number;
+}
+```
+
+### Input parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `weight` | `number` | Athlete's bodyweight in kg |
+| `protocolId` | `string` | Skinfold protocol to apply |
+| `biologicalSex` | `"MALE" \| "FEMALE"` | Determines which sex-specific coefficients are used |
+| `age` | `number` | Athlete's age in years at time of measurement |
+| `pectoral` … `axilarMedio` | `number?` | Individual skinfold measurements in mm (defaults to `0`) |
+
+### Output
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `sumaPliegues` | `number` | Sum of the skinfolds used by the selected protocol (mm) |
+| `densidadCorporal` | `number` | Body density in g/cm³ (5 d.p.) |
+| `porcentajeGrasa` | `number` | Body fat percentage (clamped 2–60%, 2 d.p.) |
+| `masaGrasa` | `number` | Fat mass in kg (2 d.p.) |
+| `masaMagra` | `number` | Lean mass in kg (2 d.p.) |
+
+---
+
+## Jackson-Pollock 3-Fold Protocol (`"3-fold"`)
+
+A three-site Jackson-Pollock equation validated for healthy adults. Site selection differs by biological sex.
+
+**Measurement sites:**
+
+- **Males:** Pectoral + Abdominal + Muslo anterior
+- **Females:** Tríceps + Suprailiaco + Muslo anterior
+
+Where **S** = sum of the three skinfolds in mm and **D** = body density in g/cm³.
+
+**Males formula:**
+
+```text
+D = 1.10938
+  − 0.0008267 × S
+  + 0.0000016 × S²
+  − 0.0002574 × Age
+```
+
+**Females formula:**
+
+```text
+D = 1.0994921
+  − 0.0009929 × S
+  + 0.0000023 × S²
+  − 0.0001392 × Age
+```
+
+<Expandable title="Source implementation (3-fold)">
+
+```typescript
+if (protocolId === "3-fold") {
+  if (biologicalSex === "MALE") {
+    sumaPliegues = pectoral + abdominal + musloAnterior;
+    densidadCorporal =
+      1.10938 -
+      0.0008267 * sumaPliegues +
+      0.0000016 * Math.pow(sumaPliegues, 2) -
+      0.0002574 * age;
+  } else {
+    sumaPliegues = triceps + suprailiaco + musloAnterior;
+    densidadCorporal =
+      1.0994921 -
+      0.0009929 * sumaPliegues +
+      0.0000023 * Math.pow(sumaPliegues, 2) -
+      0.0001392 * age;
+  }
+}
+```
+
+</Expandable>
+
+---
+
+## Durnin-Womersley 4-Fold Protocol (`"4-fold"`)
+
+The Durnin-Womersley protocol uses four sites and applies age- and sex-stratified logarithmic regression coefficients to account for fat distribution changes across the lifespan.
+
+**Measurement sites:** Tríceps + Bíceps + Subescapular + Suprailiaco
+
+**Formula:**
+
+```text
+D = C − m × log₁₀(S)
+```
+
+Where **S** = sum of all four skinfolds (mm), and **C** and **m** are looked up from the coefficient table below based on the athlete's age group and biological sex.
+
+<Note>
+  `log10(S)` uses `Math.log10(Math.max(1, sumaPliegues))` in the implementation to prevent a `log(0)` domain error when all measurements are zero.
+</Note>
+
+### Coefficient table
+
+**Males:**
+
+| Age group | C      | m      |
+|-----------|--------|--------|
+| < 20      | 1.1620 | 0.0630 |
+| 20–29     | 1.1631 | 0.0632 |
+| 30–39     | 1.1422 | 0.0544 |
+| 40–49     | 1.1620 | 0.0700 |
+| 50+       | 1.1715 | 0.0779 |
+
+**Females:**
+
+| Age group | C      | m      |
+|-----------|--------|--------|
+| < 20      | 1.1549 | 0.0678 |
+| 20–29     | 1.1599 | 0.0717 |
+| 30–39     | 1.1423 | 0.0632 |
+| 40–49     | 1.1333 | 0.0612 |
+| 50+       | 1.1339 | 0.0645 |
+
+<Expandable title="Source implementation (4-fold)">
+
+```typescript
+} else if (protocolId === "4-fold") {
+  sumaPliegues = triceps + biceps + subescapular + suprailiaco;
+  const logSum = Math.log10(Math.max(1, sumaPliegues));
+
+  let c = 1.1631;
+  let m = 0.0632;
+
+  if (biologicalSex === "MALE") {
+    if (age < 20)       { c = 1.162;  m = 0.063;  }
+    else if (age < 30)  { c = 1.1631; m = 0.0632; }
+    else if (age < 40)  { c = 1.1422; m = 0.0544; }
+    else if (age < 50)  { c = 1.162;  m = 0.07;   }
+    else                { c = 1.1715; m = 0.0779; }
+  } else {
+    if (age < 20)       { c = 1.1549; m = 0.0678; }
+    else if (age < 30)  { c = 1.1599; m = 0.0717; }
+    else if (age < 40)  { c = 1.1423; m = 0.0632; }
+    else if (age < 50)  { c = 1.1333; m = 0.0612; }
+    else                { c = 1.1339; m = 0.0645; }
+  }
+
+  densidadCorporal = c - m * logSum;
+}
+```
+
+</Expandable>
+
+---
+
+## Jackson-Pollock 7-Fold Protocol (`"7-fold"`)
+
+The most comprehensive Jackson-Pollock protocol, using seven measurement sites for greater accuracy across a wider range of body compositions.
+
+**Measurement sites:** Pectoral + Axilar medio + Tríceps + Subescapular + Abdominal + Suprailiaco + Muslo anterior
+
+Where **S** = sum of all seven skinfolds in mm and **D** = body density.
+
+**Males formula:**
+
+```text
+D = 1.112
+  − 0.00043499 × S
+  + 0.00000055 × S²
+  − 0.00028826 × Age
+```
+
+**Females formula:**
+
+```text
+D = 1.097
+  − 0.00046971 × S
+  + 0.00000056 × S²
+  − 0.00012828 × Age
+```
+
+<Expandable title="Source implementation (7-fold)">
+
+```typescript
+} else if (protocolId === "7-fold") {
+  sumaPliegues =
+    pectoral + axilarMedio + triceps + subescapular +
+    abdominal + suprailiaco + musloAnterior;
+
+  if (biologicalSex === "MALE") {
+    densidadCorporal =
+      1.112 -
+      0.00043499 * sumaPliegues +
+      0.00000055 * Math.pow(sumaPliegues, 2) -
+      0.00028826 * age;
+  } else {
+    densidadCorporal =
+      1.097 -
+      0.00046971 * sumaPliegues +
+      0.00000056 * Math.pow(sumaPliegues, 2) -
+      0.00012828 * age;
+  }
+}
+```
+
+</Expandable>
+
+---
+
+## Yuhasz Protocol (`"yuhasz"`)
+
+The Yuhasz protocol bypasses body density entirely, computing body fat percentage **directly** from the sum of six skinfolds with sex-specific linear regression equations.
+
+**Measurement sites:** Pectoral + Subescapular + Tríceps + Abdominal + Suprailiaco + Muslo anterior
+
+**Males:**
+
+```text
+%Fat = 0.1051 × S + 2.585
+```
+
+**Females:**
+
+```text
+%Fat = 0.1548 × S + 3.58
+```
+
+<Note>
+  Because Yuhasz produces `%Fat` directly, `densidadCorporal` remains at its default value of `1.0` in the returned object — the Siri formula is **not** applied for this protocol.
+</Note>
+
+<Expandable title="Source implementation (Yuhasz)">
+
+```typescript
+} else if (protocolId === "yuhasz") {
+  sumaPliegues = pectoral + subescapular + triceps + abdominal + suprailiaco + musloAnterior;
+  isDirectGrasa = true;
+  if (biologicalSex === "MALE") {
+    porcentajeGrasa = 0.1051 * sumaPliegues + 2.585;
+  } else {
+    porcentajeGrasa = 0.1548 * sumaPliegues + 3.58;
+  }
+}
+```
+
+</Expandable>
+
+---
+
+## Siri Formula — Body Density → Body Fat %
+
+For the **3-fold**, **4-fold**, and **7-fold** protocols, FocusFlow converts body density to body fat percentage using the classic Siri (1956) two-compartment model:
+
+```text
+%Fat = (4.95 / D − 4.5) × 100
+```
+
+Where **D** is the body density in g/cm³ computed by the relevant Jackson-Pollock or Durnin-Womersley equation.
+
+```typescript
+// Siri Formula (applied only when !isDirectGrasa)
+porcentajeGrasa = (4.95 / (densidadCorporal || 1)) - 4.5;
+porcentajeGrasa = porcentajeGrasa * 100;
+```
+
+---
+
+## Clamping
+
+After the percentage is computed (via Siri or Yuhasz), the result is clamped to a physiologically safe range to guard against extreme outliers caused by measurement error:
+
+```typescript
+// Clamp %Grasa between 2% and 60% for physical safety
+porcentajeGrasa = Math.max(2, Math.min(60, porcentajeGrasa));
+```
+
+<Tip>
+  The 2% lower bound represents the minimum essential fat necessary for physiological function. The 60% upper bound is a conservative ceiling well above clinically observed maximum values, ensuring downstream calculations never produce nonsensical masses.
+</Tip>
+
+---
+
+## Derived Values
+
+Once `porcentajeGrasa` is finalised, fat and lean masses are computed from the athlete's bodyweight:
+
+```text
+masaGrasa (kg) = weight × (porcentajeGrasa / 100)
+masaMagra (kg) = weight − masaGrasa
+```
+
+```typescript
+const masaGrasa = weight * (porcentajeGrasa / 100);
+const masaMagra = weight - masaGrasa;
+```
+
+All five output values are returned with fixed decimal precision:
+
+```typescript
+return {
+  sumaPliegues:     Number(sumaPliegues.toFixed(1)),     // 1 d.p.
+  densidadCorporal: Number(densidadCorporal.toFixed(5)), // 5 d.p.
+  porcentajeGrasa:  Number(porcentajeGrasa.toFixed(2)),  // 2 d.p.
+  masaGrasa:        Number(masaGrasa.toFixed(2)),        // 2 d.p.
+  masaMagra:        Number(masaMagra.toFixed(2)),        // 2 d.p.
+};
+```
+
+---
+
+## `calculateAgeAtDate`
+
+A helper function used internally to compute the athlete's exact age in whole years at the time a plicometría log is recorded. This ensures the age-dependent terms in the 3-fold, 4-fold, and 7-fold formulas reflect the athlete's age on the day of measurement rather than their current age.
+
+```typescript
+export function calculateAgeAtDate(
+  birthDateStr: string,
+  logDateStr: string
+): number
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `birthDateStr` | `string` | Athlete's date of birth in `YYYY-MM-DD` format |
+| `logDateStr` | `string` | Date of the plicometría log in `YYYY-MM-DD` format |
+
+### Return value
+
+The athlete's age in whole years on the log date. Returns **30** as a safe default if either date string is missing or cannot be parsed.
+
+### Logic
+
+```typescript
+export function calculateAgeAtDate(
+  birthDateStr: string,
+  logDateStr: string
+): number {
+  if (!birthDateStr) return 30;
+  const birth = new Date(birthDateStr);
+  const target = new Date(logDateStr);
+  if (isNaN(birth.getTime()) || isNaN(target.getTime())) return 30;
+
+  let age = target.getFullYear() - birth.getFullYear();
+  const m = target.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && target.getDate() < birth.getDate())) {
+    age--;
+  }
+  return Math.max(0, age);
+}
+```
+
+The birthday-boundary check (`m < 0 || (m === 0 && date < birthDate)`) ensures athletes whose birthday falls later in the measurement year are not counted as a year older than they actually are.
+
+<Note>
+  The default fallback of **30** is a deliberate choice: it sits near the centre of most adult training populations, minimising systematic error in age-dependent terms when birth date data is unavailable.
+</Note>

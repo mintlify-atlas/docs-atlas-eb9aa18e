@@ -1,0 +1,129 @@
+---
+title: "Reviews and Check-ins: Athlete Weekly Progress Reports"
+sidebarTitle: "Reviews"
+description: "Manage athlete weekly check-ins in FocusFlow: view wellness forms, progress photos, body measurements, and send coach feedback from a centralized inbox."
+---
+
+The **Reviews** system is FocusFlow's structured weekly feedback loop between coach and athlete. At the end of each review period (7, 14, or 30 days, set per athlete in their `ClientProfile`), the athlete submits a check-in report containing their current body measurements, progress photos, subjective wellness scores, and a free-text comment. Coaches review each submission, write technical feedback, and optionally attach annotated images — creating an ongoing, documented dialogue that drives intelligent training adjustments over time.
+
+## The `Review` Type
+
+Every check-in is stored as a `Review` document in Firestore. The full interface is:
+
+```typescript
+export interface Review {
+  id: string;
+  clientId: string;
+  clientName: string;
+  date: string; // YYYY-MM-DD
+  measurements: BodyMeasurements;
+  comment: string;
+  photos: string[]; // Base64 data URLs
+  status: "pending" | "reviewed";
+  coachFeedback?: string;
+  feedbackPhotos?: string[];
+  driveFolderUrl?: string;
+  reviewedAt?: string;
+  acknowledgedByClient: boolean;
+  workoutHistory?: WorkoutSummary[];
+}
+```
+
+Key status transitions:
+
+- **`pending`** — submitted by athlete, awaiting coach evaluation.
+- **`reviewed`** — coach has submitted `coachFeedback`; `reviewedAt` is stamped automatically.
+- **`acknowledgedByClient`** — set to `true` once the athlete opens and reads the feedback on their portal.
+
+## Centralized Reviews Inbox
+
+The top-level **Reviews** tab in the coach dashboard presents a unified inbox of every check-in from every athlete, sorted by submission date (most recent first). Each list entry surfaces:
+
+<CardGroup cols={3}>
+  <Card title="Athlete Name" icon="user">
+    Full name of the submitting athlete, drawn from `clientName`.
+  </Card>
+  <Card title="Submission Date" icon="calendar">
+    The `date` field in `YYYY-MM-DD` format — the date the athlete logged the review.
+  </Card>
+  <Card title="Status Badge" icon="tag">
+    Either **Pendiente de Evaluar** (amber) or **Evaluado** (emerald), reflecting `review.status`.
+  </Card>
+</CardGroup>
+
+The oldest review in an athlete's history is automatically tagged **Revisión Inicial**, marking the baseline measurement for progress comparison.
+
+## What Coaches See in Each Check-in
+
+Opening a review card expands the full submission. The left column belongs to the athlete's self-reported data; the right column is the coach's response area.
+
+<Accordion title="Athlete Wellness & Comment">
+  The athlete's free-text **Notas y Sensaciones** is displayed as a quoted block. This is the `comment` field and typically contains subjective notes about energy, sleep, stress, and diet adherence for the period.
+</Accordion>
+
+<Accordion title="Body Measurements (Perímetros Físicos)">
+  All non-zero fields from the embedded `BodyMeasurements` object are displayed in a compact grid with the measurement label and value in centimetres. Available measurement sites include:
+
+  | Field | Site |
+  |---|---|
+  | `cuello` | Neck |
+  | `pecho` | Chest / Thorax |
+  | `cintura` | Waist |
+  | `cadera` | Hip |
+  | `brazoContraido` | Flexed arm |
+  | `musloMedio` | Mid-thigh |
+  | `gemelo` | Calf |
+  | … | (full list in `BodyMeasurements`) |
+</Accordion>
+
+<Accordion title="Progress Photos">
+  Up to three photos (Front, Side, Back) are stored as base64 data URLs in the `photos` array and rendered as thumbnails. Clicking any thumbnail opens a full-screen lightbox via `setSelectedCoachPhotoUrl`.
+</Accordion>
+
+<Accordion title="Attached Workout History">
+  If the athlete completed training sessions during the review period, the `workoutHistory` array contains a `WorkoutSummary[]` for each session. Each entry shows:
+
+  - **Day name** (`dayName`) and **date**
+  - **Time spent** (converted from `timeSpentSeconds` to minutes)
+  - **Compliance rate** (`completionRate` %) — colour-coded: ≥ 80% emerald, ≥ 50% amber, < 50% rose.
+</Accordion>
+
+## Providing Feedback
+
+<Steps>
+  <Step title="Open the pending review">
+    Locate the check-in in the Reviews inbox (status badge: **Pendiente de Evaluar**). Click the **Evaluar Reporte Ahora** button to expand the inline feedback form.
+  </Step>
+  <Step title="Write technical feedback">
+    Type your coaching notes, load adjustments, nutritional corrections, or habit guidance into the `coachFeedback` textarea. The placeholder reads: *"Indica ajustes de cargas, alimentación o hábitos…"*
+  </Step>
+  <Step title="Attach visual corrections (optional)">
+    Annotated images — technique diagrams, posture corrections, exercise demonstrations — can be attached as `feedbackPhotos`. These appear to the athlete under **Correcciones visuales enviadas**.
+  </Step>
+  <Step title="Submit the evaluation">
+    Click **Validar y Enviar**. FocusFlow calls `onEvaluateReview(reviewId, feedback, photos)`, sets `status` to `"reviewed"`, stamps `reviewedAt`, and notifies: *"Revisión evaluada correctamente. El atleta recibirá feedback en su portal."*
+  </Step>
+  <Step title="Athlete acknowledgement">
+    Once the athlete opens the feedback on their portal, `acknowledgedByClient` flips to `true`. You can edit a previously submitted evaluation at any time using the pencil icon (Edit2).
+  </Step>
+</Steps>
+
+## Google Drive Integration
+
+If `driveFolderUrl` is set on a review, the check-in card displays a link to a Google Drive folder containing the original full-resolution photos. This is useful when athletes upload hi-res photos outside the app (e.g., via a Google Form or direct Drive upload).
+
+<Note>
+  Google Drive integration requires the athlete or coach to have completed **Google OAuth sign-in**. The `driveFolderUrl` is populated manually or via an automated pipeline — FocusFlow does not upload directly to Drive.
+</Note>
+
+## Per-Athlete Reviews Sub-Tab
+
+The centralized inbox shows all athletes at once. For a historical view scoped to a single athlete, navigate to:
+
+**Athlete Profile → Reviews sub-tab**
+
+This view (`AthleteReviewsView`) filters reviews by `clientId === targetCli.id` and sorts them newest-first, giving you a clean progression timeline for one individual. The oldest entry in this view is always tagged **Revisión Inicial**.
+
+<Note>
+  **Photo storage — important:** Progress photos (`photos[]` and `feedbackPhotos[]`) are stored as **base64 data URLs in `localStorage`**, not in Firestore, because Firestore documents have a 1 MB size limit. The `reconcileLocalAndCloud` function in `src/lib/firebase.ts` ensures that during cloud sync, locally stored photos are **never overwritten** by a cloud-only document that lacks them. Always use a device that has previously loaded the photos to view them.
+</Note>

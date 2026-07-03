@@ -1,0 +1,498 @@
+---
+title: "FocusFlow Data Model: Types, Interfaces, and Relationships"
+sidebarTitle: "Data Model"
+description: "Complete TypeScript interface reference for FocusFlow's core entities: users, routines, workouts, reviews, measurements, and more."
+---
+
+FocusFlow's data model is defined entirely in `src/types.ts` and follows a TypeScript-first design philosophy. Every entity that crosses the React ↔ Firestore boundary is a plain TypeScript interface — no class hierarchies, no ORM abstractions. This keeps serialisation to JSON trivial and ensures that the shape of what is stored in Firestore is always exactly what the TypeScript compiler has verified. The sections below document every major interface, its fields, and how the entities relate to one another.
+
+---
+
+## Core Types
+
+### `UserRole`
+
+```typescript
+type UserRole = "coach" | "client" | "admin";
+```
+
+The role discriminator used throughout the app to gate access to dashboards, filter data queries, and determine which Firestore documents a user can read or write.
+
+---
+
+### `User`
+
+<Expandable title="Interface definition">
+```typescript
+interface User {
+  id: string;
+  username: string;
+  passwordHash: string;          // BCrypt-simulated hash
+  isTemporaryPassword: boolean;
+  needsQuestionnaire: boolean;
+  fullName: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: UserRole;
+  avatarUrl?: string;
+  coachId?: string;              // Links a client to their assigned coach
+  isPaused?: boolean;            // Suspends access for the user (and their clients)
+  biologicalSex?: "MALE" | "FEMALE";
+  birthDate?: string;            // YYYY-MM-DD
+}
+```
+</Expandable>
+
+<ParamField path="id" type="string" required>
+  Unique user identifier. Used as the primary key across all related entities.
+</ParamField>
+<ParamField path="role" type="UserRole" required>
+  Determines which dashboard is rendered: `coach`, `client`, or `admin`.
+</ParamField>
+<ParamField path="coachId" type="string">
+  Present on `client` users only. References the `id` of their assigned coach.
+</ParamField>
+<ParamField path="isPaused" type="boolean">
+  When `true` on a coach, all of that coach's clients are also auto-logged out.
+</ParamField>
+
+---
+
+### `ClientProfile`
+
+<Expandable title="Interface definition">
+```typescript
+interface ClientProfile {
+  clientId: string;
+  targetGoal: string;
+  currentWeight: number;
+  currentHeight: number;
+  routineComplianceRate: number;     // Percentage (0–100)
+  reviewPeriodDays: number;          // 7, 14, or 30
+  progressionStrategy: string;       // e.g. "Doble progresión", "Lineal"
+  planType: string;
+  lastPaymentDate: string;           // ISO string
+  requiredMeasurements?: string[];
+  evaluationUnlocked?: boolean;
+  nextExpirationDate?: string;       // YYYY-MM-DD override
+  renewalMode?: "auto" | "manual";
+  isPlicometriaEnabled?: boolean;
+  plicometriaProtocolId?: "3-fold" | "4-fold" | "7-fold" | "yuhasz" |
+                           "jackson_pollock_3" | "jackson_pollock_4" |
+                           "jackson_pollock_7";
+  biologicalSex?: "MALE" | "FEMALE";
+  birthDate?: string;                // YYYY-MM-DD
+  coachNotes?: string;
+  coachTasks?: { id: string; text: string; completed: boolean }[];
+}
+```
+</Expandable>
+
+<ParamField path="clientId" type="string" required>
+  Foreign key matching `User.id`. One `ClientProfile` exists per client user.
+</ParamField>
+<ParamField path="routineComplianceRate" type="number" required>
+  Automatically recalculated on every workout completion as the average `completionRate` across all of this client's `WorkoutSummary` records.
+</ParamField>
+<ParamField path="isPlicometriaEnabled" type="boolean">
+  Coach-controlled flag. When `true`, the skinfold measurement module is visible in the client's dashboard.
+</ParamField>
+<ParamField path="plicometriaProtocolId" type="string">
+  Selects which Jackson-Pollock or Yuhasz formula is used when calculating body composition from raw skinfold values.
+</ParamField>
+<ParamField path="coachTasks" type="array">
+  Array of task objects `{ id, text, completed }` that the coach can maintain as a private to-do list for this client.
+</ParamField>
+
+---
+
+### `Exercise`
+
+<Expandable title="Interface definition">
+```typescript
+interface Exercise {
+  id: string;
+  name: string;
+  category: string;   // "Pecho", "Espalda", "Piernas", "Hombros", "Brazos", "Cardio"
+  description?: string;
+  coachId?: string;   // Scopes the exercise to a specific coach's library
+}
+```
+</Expandable>
+
+Exercises are stored in the global `fit_exercises` collection but are filtered by `coachId` at the dashboard level, so each coach only sees their own custom exercises plus the platform defaults (where `coachId` is absent).
+
+---
+
+### `ExerciseSet`
+
+<Expandable title="Interface definition">
+```typescript
+interface ExerciseSet {
+  setIndex: number;
+  targetReps: string;       // e.g. "8-10" or "12"
+  achievedReps?: number;
+  weightUsed?: number;
+  completed: boolean;
+  skipped: boolean;
+  targetRpe?: string;       // e.g. "@6.0", "9"
+}
+```
+</Expandable>
+
+`ExerciseSet` records appear in two contexts: as the prescribed template inside a `RoutineExercise.sets[]` and as the athlete's live performance log inside `ActiveWorkoutSession.exercises` and `WorkoutSummary.loggedExercises`.
+
+---
+
+### `RoutineExercise`
+
+<Expandable title="Interface definition">
+```typescript
+interface RoutineExercise {
+  id: string;
+  exerciseId: string;
+  name: string;
+  category: string;
+  optional: boolean;
+  setsCount: number;
+  repsText: string;
+  intensity: string;        // e.g. "RPE 8", "RIR 2"
+  expectedWeight: number;   // Starting weight suggestion in kg
+  notes: string;
+  sets: ExerciseSet[];
+  customized?: boolean;
+}
+```
+</Expandable>
+
+---
+
+### `RoutineDay`
+
+<Expandable title="Interface definition">
+```typescript
+interface RoutineDay {
+  id: string;
+  name: string;             // e.g. "Lunes - Torso", "Martes - Pierna"
+  notes?: string;
+  exercises: RoutineExercise[];
+  optional?: boolean;
+}
+```
+</Expandable>
+
+---
+
+### `Routine`
+
+<Expandable title="Interface definition">
+```typescript
+interface Routine {
+  id: string;
+  clientId: string;
+  name: string;
+  isActive: boolean;        // Active routine vs. "Siguiente Rutina" (queued)
+  days: RoutineDay[];
+  assignedAt: string;       // ISO string
+  startDate?: string;       // YYYY-MM-DD
+  endDate?: string;         // YYYY-MM-DD
+  globalRestSeconds?: number;
+}
+```
+</Expandable>
+
+<ParamField path="isActive" type="boolean" required>
+  When `startDate` and `endDate` are set, `isActive` is dynamically overridden at render time using `useMemo` — it is `true` only when today's date falls within the date range.
+</ParamField>
+
+---
+
+### `WorkoutSummary`
+
+<Expandable title="Interface definition">
+```typescript
+interface WorkoutSummary {
+  id: string;
+  clientId: string;
+  routineId: string;
+  dayId: string;
+  dayName: string;
+  date: string;                      // YYYY-MM-DD
+  timeSpentSeconds: number;
+  totalVolume: number;               // Sum of (reps × weight) across all sets
+  completionRate: number;            // Percentage of sets completed vs. planned
+  isRestDay: boolean;
+  notes?: string;
+  loggedExercises?: {
+    [routineExerciseId: string]: ExerciseSet[];
+  };
+  loggedExerciseDetails?: {
+    [routineExerciseId: string]: {
+      name: string;
+      category: string;
+      userNotes?: string;
+    };
+  };
+}
+```
+</Expandable>
+
+---
+
+### `DailyWeight`
+
+```typescript
+interface DailyWeight {
+  date: string;   // YYYY-MM-DD
+  value: number;  // Weight in kg
+}
+```
+
+Weight logs are stored as `{ [clientId: string]: DailyWeight[] }` under the `fit_weight_logs` key. Only one entry per date per client is retained — a new log for the same date overwrites the previous one.
+
+---
+
+### `PlicometriaLog`
+
+<Expandable title="Interface definition">
+```typescript
+interface PlicometriaLog {
+  id: string;
+  clientId: string;
+  date: string;               // YYYY-MM-DD
+  weight: number;             // Current body weight in kg
+
+  protocolId: "3-fold" | "4-fold" | "7-fold" | "yuhasz";
+
+  // Skinfold measurements (mm) — fields present depend on the protocol
+  pectoral?: number;
+  abdominal?: number;
+  musloAnterior?: number;
+  triceps?: number;
+  suprailiaco?: number;
+  biceps?: number;
+  subescapular?: number;
+  axilarMedio?: number;
+
+  // Calculated outputs
+  sumaPliegues: number;
+  densidadCorporal: number;
+  porcentajeGrasa: number;
+  masaGrasa: number;          // kg
+  masaMagra: number;          // kg
+
+  createdBy: "coach" | "client";
+  createdAt: string;          // ISO string
+}
+```
+</Expandable>
+
+<Note>
+  The skinfold fields that are populated depend on the selected `protocolId`. For example, `"3-fold"` uses `pectoral`, `abdominal`, and `musloAnterior` for males. All calculated fields (`sumaPliegues`, `densidadCorporal`, `porcentajeGrasa`, `masaGrasa`, `masaMagra`) are derived by the client-side formula engine at entry time and stored pre-calculated.
+</Note>
+
+---
+
+### `BodyMeasurements`
+
+<Expandable title="Interface definition">
+```typescript
+interface BodyMeasurements {
+  date: string;                // YYYY-MM-DD
+  cuello?: number;             // Neck
+  hombros?: number;            // Shoulders
+  pecho?: number;              // Chest / thorax
+  bajoBusto?: number;          // Under-bust circumference
+  brazoRelajado?: number;      // Arm relaxed
+  brazoContraido?: number;     // Arm flexed
+  antebraco?: number;          // Forearm
+  muneca?: number;             // Wrist
+  cintura?: number;            // Waist
+  cinturaUmbilical?: number;   // Umbilical waist
+  cadera?: number;             // Hip
+  gluteos?: number;            // Glutes
+  musloSuperior?: number;      // Upper thigh
+  musloMedio?: number;         // Mid thigh
+  gemelo?: number;             // Calf
+  tobillo?: number;            // Ankle
+  peso?: number;               // Body weight (kg)
+
+  // Legacy fields retained for backwards compatibility
+  biceps?: number;
+  pierna?: number;
+  espalda?: number;
+}
+```
+</Expandable>
+
+Measurement logs are stored as `{ [clientId: string]: BodyMeasurements[] }` under `fit_measurements_logs`. When a review is submitted, its `measurements` object is automatically merged into this log for the matching date.
+
+---
+
+### `Review`
+
+<Expandable title="Interface definition">
+```typescript
+interface Review {
+  id: string;
+  clientId: string;
+  clientName: string;
+  date: string;                // YYYY-MM-DD
+  measurements: BodyMeasurements;
+  comment: string;
+  photos: string[];            // Base64 data URLs (stored locally only)
+  status: "pending" | "reviewed";
+  coachFeedback?: string;
+  feedbackPhotos?: string[];   // Annotated coach feedback images (local only)
+  driveFolderUrl?: string;     // Google Drive folder link for full-resolution originals
+  reviewedAt?: string;
+  acknowledgedByClient: boolean;
+  workoutHistory?: WorkoutSummary[];
+}
+```
+</Expandable>
+
+<Warning>
+  `photos` and `feedbackPhotos` are **not** persisted to Firestore due to document size constraints. They are stored exclusively in `localStorage` via the `fit_offline_backup_fit_reviews` key. The reconciliation logic in `loadFromCloud` always restores these fields from local backup when merging cloud and local records. Use `driveFolderUrl` to link to full-resolution files stored in Google Drive.
+</Warning>
+
+---
+
+### `Message`
+
+<Expandable title="Interface definition">
+```typescript
+interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  timestamp: string;   // ISO string
+  isRead: boolean;
+}
+```
+</Expandable>
+
+---
+
+### `AgendaEvent`
+
+<Expandable title="Interface definition">
+```typescript
+type AgendaEventType =
+  | "review"
+  | "payment"
+  | "videocall"
+  | "call"
+  | "presential_training"
+  | "other";
+
+interface AgendaEvent {
+  id: string;
+  clientId: string;
+  clientName: string;
+  coachId: string;
+  type: AgendaEventType;
+  title: string;
+  date: string;        // YYYY-MM-DD
+  time?: string;       // HH:MM
+  notes?: string;
+  notified: boolean;
+  meetLink?: string;
+}
+```
+</Expandable>
+
+---
+
+### `AppNotification`
+
+<Expandable title="Interface definition">
+```typescript
+interface AppNotification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: "workout" | "review" | "message" | "general";
+  timestamp: string;
+  isRead: boolean;
+  linkTab?: "workout" | "calendar" | "progress" | "review" | "gallery" |
+            "chat" | "profile" | "athletes" | "templates" | "messages" |
+            "settings" | "reviews" | "agenda" | "billing" | "summary" |
+            "exercises_menu";
+}
+```
+</Expandable>
+
+`linkTab` is used by `NotificationCenter` to navigate the user to a specific dashboard tab when they tap a notification.
+
+---
+
+## Entity Relationships
+
+```
+User (role: coach)
+ └─► ClientProfile (1:1 via clientId)
+ └─► Routine[] (1:N via clientId)
+      └─► RoutineDay[] (embedded)
+           └─► RoutineExercise[] (embedded)
+                └─► ExerciseSet[] (embedded)
+
+User (role: client)
+ └─► ClientProfile (1:1 via clientId)
+ └─► WorkoutSummary[] (1:N via clientId)
+ └─► DailyWeight[] (1:N via clientId key in weightLogs map)
+ └─► BodyMeasurements[] (1:N via clientId key in measurementsLogs map)
+ └─► PlicometriaLog[] (1:N via clientId key in plicometriaLogs map)
+ └─► Review[] (1:N via clientId)
+ └─► Message[] (1:N as sender or receiver)
+
+User (role: coach)
+ └─► AgendaEvent[] (1:N via coachId)
+ └─► Exercise[] (1:N via coachId — coach-specific library)
+ └─► WorkoutTemplate[] (1:N via coachId)
+ └─► CoachProfile (1:1 via coachId)
+```
+
+---
+
+## Firestore Collection Structure
+
+All entities are stored as individual JSON documents inside the single Firestore collection `coaching_data`. Each document key corresponds to one of the 16 `SYNC_KEYS`. The document payload is the entire serialised array (or map) for that entity type.
+
+```typescript
+// From src/lib/firebase.ts
+export const SYNC_KEYS = [
+  "fit_users",                    // User[]
+  "fit_client_profiles",          // ClientProfile[]
+  "fit_coach_profiles",           // CoachProfile[]
+  "fit_exercises",                // Exercise[]
+  "fit_templates",                // WorkoutTemplate[]
+  "fit_routines",                 // Routine[]
+  "fit_weight_logs",              // { [clientId]: DailyWeight[] }
+  "fit_measurements_logs",        // { [clientId]: BodyMeasurements[] }
+  "fit_plicometria_logs",         // { [clientId]: PlicometriaLog[] }
+  "fit_reviews",                  // Review[]
+  "fit_messages",                 // Message[]
+  "fit_agenda_events",            // AgendaEvent[]
+  "fit_summaries",                // WorkoutSummary[]
+  "fit_client_calendar_schedule", // { [clientId]: { [dateStr]: dayId } }
+  "fit_active_session",           // { [clientId]: ActiveWorkoutSession }
+  "fit_notifications",            // AppNotification[]
+];
+```
+
+Each Firestore document has the shape:
+
+```json
+{
+  "payload": "<JSON-serialised array or map>",
+  "updatedAt": "2024-11-15T10:32:00.000Z"
+}
+```
+
+<Note>
+  This single-document-per-collection pattern means all reads and writes for a given entity type operate on the **complete array**. This simplifies query logic (no `where` clauses needed) and minimises Firestore read costs, but means large collections (e.g. `fit_summaries` with many clients) should be monitored for document size as Firestore enforces a 1 MiB per-document limit.
+</Note>

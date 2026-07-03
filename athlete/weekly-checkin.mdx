@@ -1,0 +1,94 @@
+---
+title: "Weekly Check-in: Submit Your Progress Report to Your Coach"
+sidebarTitle: "Check-in"
+description: "Submit your weekly check-in in FocusFlow: rate energy, sleep, stress, and diet adherence, enter body measurements, and upload Front, Side, and Back progress photos."
+---
+
+The **Weekly Check-in** (Revisión Semanal) is your structured weekly communication channel with your coach. Think of it as a concise written report that captures how you felt, how your body is responding, and what your current measurements look like — all in one place. Your coach reviews every check-in, records observations, and replies with personalised feedback so you stay aligned on adjustments to your training or nutrition plan.
+
+## Submitting a Check-in
+
+Open the **Revisiones** tab in the navigation bar to access the check-in form. You can submit a new check-in once your `reviewPeriodDays` cooldown has elapsed since your last submission (configured by your coach as 7, 14, or 30 days). If the period has not yet passed, the form shows a countdown lock indicating how long remains.
+
+### Wellness Scores
+
+Rate each of the following dimensions on a scale of **1 to 5** (1 = very poor, 5 = excellent):
+
+| Score | What it measures |
+|---|---|
+| Energy level | How energised you have felt throughout the week |
+| Sleep quality | How restorative your sleep has been |
+| Stress control | How well you have managed mental and emotional stress |
+| Diet / training adherence | How closely you have followed your nutrition and training plan |
+
+These four scores give your coach a fast at-a-glance summary of your weekly subjective wellbeing before they read your comment or review your photos.
+
+### Body Measurements
+
+Enter your current circumference measurements for any tracked sites directly in the check-in form. These values are saved in the `Review.measurements` field as a `BodyMeasurements` object and allow your coach to compare your dimensions week-over-week without you needing to open the Progress tab separately.
+
+### Comment
+
+Write a free-text comment in the **Comentario** field. This is the most important part of the check-in — describe how your digestion has been, how you felt in your workouts, any aches or niggles, and anything else you want your coach to know. A comment is **required** to submit the form.
+
+### Progress Photo Upload
+
+Upload three photos documenting your current physique. Each slot corresponds to a specific angle:
+
+| Slot | View |
+|---|---|
+| `frontal` | Vista Frontal — front-facing, arms slightly away from body |
+| `espalda` | Espalda — back-facing, same arm position |
+| `izq` / `der` | Perfil — side profile (left or right) |
+
+Tap the camera icon on each slot to either **take a photo directly** with your device camera or **upload a file** from your gallery. Images are automatically resized and compressed (max 400 × 500 px at 40% JPEG quality) before being stored to keep file sizes manageable.
+
+<Warning>
+  Progress photos are stored as base64 data URLs inside the `Review` document and in your browser's `localStorage`. They are **not uploaded to Firebase Firestore** due to document size constraints. This means photos are **device-specific** — if you clear your browser storage or switch to a different device, previously saved photos will no longer be visible in the Gallery tab. Use the **Google Drive sync** option (toggle the "Sync to Drive" switch before submitting) to permanently back up your photos to the cloud.
+</Warning>
+
+### Google Drive Sync (Optional)
+
+If your coach has configured the Google Drive integration, a **Sync to Drive** toggle appears above the submit button. Enabling it before you submit will upload your photos to a shared Drive folder and attach the folder URL to the `Review` as `driveFolderUrl`. This gives both you and your coach a permanent, device-independent copy of every photo.
+
+## Submission
+
+Tap **Enviar Revisión** to submit. FocusFlow creates a new `Review` document with:
+
+```typescript
+interface Review {
+  id: string;
+  clientId: string;
+  clientName: string;
+  date: string;                 // YYYY-MM-DD submission date
+  measurements: BodyMeasurements;
+  comment: string;
+  photos: string[];             // base64 data URLs for each uploaded photo slot
+  status: "pending";            // always "pending" on initial submission
+  acknowledgedByClient: false;  // cleared once you read coach feedback
+  driveFolderUrl?: string;      // present only if Drive sync was used
+}
+```
+
+Your coach will see the new submission appear in their centralised **Reviews** inbox with a `pending` badge.
+
+## Reading Coach Feedback
+
+<Steps>
+  <Step title="Coach reviews your check-in">
+    After your coach reads your submission, writes their feedback, and taps **Submit Feedback**, the `Review.status` changes from `"pending"` to `"reviewed"` and `Review.coachFeedback` is populated with their written response.
+  </Step>
+  <Step title="You receive a notification">
+    FocusFlow generates an `AppNotification` for you with `type: "review"` and `linkTab: "review"`. You will see a badge on the **Revisiones** tab and a notification in your notification feed. Tap it to jump directly to the check-in.
+  </Step>
+  <Step title="Read the feedback">
+    Open the check-in entry in the Revisiones tab. Your coach's feedback is displayed below your original comment, alongside any annotated feedback photos they may have attached in `feedbackPhotos`.
+  </Step>
+  <Step title="Acknowledge">
+    Once you have read the feedback, FocusFlow sets `acknowledgedByClient: true` on the `Review` document. This clears the notification badge so your coach knows you have seen their response.
+  </Step>
+</Steps>
+
+## Check-in Cadence
+
+Your coach configures `reviewPeriodDays` on your `ClientProfile` — either `7`, `14`, or `30` days. You cannot submit a new check-in until the configured period has elapsed since your most recent submission. This cadence ensures your coach reviews each report properly before the next one arrives, and gives your body enough time to show measurable change between photos.

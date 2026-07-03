@@ -1,0 +1,140 @@
+---
+title: "Billing: Track Athlete Subscriptions and Income"
+sidebarTitle: "Billing"
+description: "Manage athlete subscription payments in FocusFlow: record monthly fees, mark invoices as paid or overdue, and view cumulative monthly income estimates."
+---
+
+The **Billing** tab is FocusFlow's financial management layer for personal trainers. It gives coaches a single dashboard to define their service tiers, see at a glance which athletes are current on their subscriptions and which are approaching renewal, and keep an accurate record of who has paid and when. Coaches can configure as many subscription plans as their business requires, assign each athlete to the appropriate tier, and override renewal dates manually — all without leaving the app.
+
+## Coach Platform Profile
+
+Each coach account has a `CoachProfile` that captures the coach's own subscription plan within the FocusFlow platform, along with the financial parameters that determine their payout:
+
+```typescript
+export interface CoachProfile {
+  coachId: string;
+  planName: "Bronce" | "Plata" | "Oro" | "Elite";
+  monthlyCost: number;
+  maxAthletes: number;
+  payoutRate: number;
+  platformCommission: number;
+  nextBillingDate: string;
+}
+```
+
+| Field                | Description                                                                              |
+| -------------------- | ---------------------------------------------------------------------------------------- |
+| `planName`           | The coach's FocusFlow subscription tier — `"Bronce"`, `"Plata"`, `"Oro"`, or `"Elite"`. |
+| `monthlyCost`        | Monthly cost the coach pays to the platform (in €).                                     |
+| `maxAthletes`        | Maximum number of athletes permitted under this plan.                                   |
+| `payoutRate`         | Percentage of athlete fees the coach retains.                                            |
+| `platformCommission` | Platform commission percentage deducted from athlete payments.                           |
+| `nextBillingDate`    | ISO date string for the coach's own next platform billing cycle.                        |
+
+## Athlete Subscription Fields
+
+The billing-relevant fields on each athlete's `ClientProfile` are:
+
+```typescript
+export interface ClientProfile {
+  clientId: string;
+  planType: string;               // e.g., "Mensual", "Trimestral"
+  lastPaymentDate: string;        // ISO String
+  nextExpirationDate?: string;    // YYYY-MM-DD (edit-override format)
+  renewalMode?: "auto" | "manual";
+  // ...other profile fields
+}
+```
+
+<Accordion title="planType">
+  The subscription tier this athlete is currently enrolled in — for example, `"Mensual"` (1 month, €39), `"Trimestral"` (3 months, €99), `"Semestral"` (6 months, €179), or `"Anual"` (12 months, €299). Coaches can define custom plan names, prices, and durations from the **Planes de Suscripción** section at the top of the Billing tab.
+</Accordion>
+
+<Accordion title="lastPaymentDate">
+  An ISO string recording the date of the athlete's last confirmed payment. Used as the baseline date from which `nextExpirationDate` is calculated when a payment is recorded.
+</Accordion>
+
+<Accordion title="nextExpirationDate">
+  The next renewal date in `YYYY-MM-DD` format. This field can be automatically computed from `lastPaymentDate` + `planType.months`, or overridden manually via the inline date picker in the billing table. It drives the payment status colour coding in the UI.
+</Accordion>
+
+<Accordion title="renewalMode">
+  Controls how the subscription is renewed:
+  - **`"auto"`** — The subscription is expected to renew automatically. Displayed as 🔄 Automática in the billing table.
+  - **`"manual"`** — The coach must confirm each renewal cycle. Displayed as 👤 Manual. Useful for athletes on one-off or irregular plans.
+</Accordion>
+
+## Subscription Plans
+
+Coaches define their own service tiers in the **Planes de Suscripción** bento grid. The default plans shipped with FocusFlow are:
+
+| Plan        | Duration  | Price  |
+| ----------- | --------- | ------ |
+| Mensual     | 1 month   | €39    |
+| Trimestral  | 3 months  | €99    |
+| Semestral   | 6 months  | €179   |
+| Anual       | 12 months | €299   |
+
+Plans are stored locally in `localStorage` under the key `fit_subscription_plans` and can be created, edited, or deleted at any time via the **Nuevo Plan** button. Each plan carries a `name`, `price`, `months`, and a short `description` shown to athletes.
+
+## Payment Status
+
+The billing table uses three visual states to indicate where each athlete stands:
+
+<CardGroup cols={3}>
+  <Card title="Pagado (Paid)" icon="circle-check">
+    Displayed in **green** (`emerald`). The athlete's `nextExpirationDate` is in the future. Their access is active and the account shows `Active 🟢`.
+  </Card>
+  <Card title="Pendiente (Pending)" icon="clock">
+    Displayed in **amber**. The `nextExpirationDate` is approaching within the current week. A visual warning prompts the coach to follow up or confirm payment.
+  </Card>
+  <Card title="Vencido (Overdue)" icon="circle-exclamation">
+    Displayed in **red**. The `nextExpirationDate` is in the past — the subscription has lapsed. The coach can manually pause the athlete's access while awaiting payment.
+  </Card>
+</CardGroup>
+
+Status is determined at render time by comparing `nextExpirationDate` (or the computed date from `lastPaymentDate` + plan months) against today's date.
+
+## Recording a Payment
+
+<Steps>
+  <Step title="Locate the athlete in the billing table">
+    Open the **Facturación** tab. The **Administración de Cuentas de Atletas** table lists every athlete with their current plan, renewal mode, estimated monthly cost, and next expiration date.
+  </Step>
+  <Step title="Confirm the plan assignment">
+    If the athlete has changed tier, update the **Plan Facturación Asignado** dropdown. The estimated cost column recalculates immediately based on the selected plan's price.
+  </Step>
+  <Step title="Update the expiration date">
+    Click the inline date picker in the **Próximo Vencimiento** column and set the new renewal date. This directly updates `nextExpirationDate` on the `ClientProfile`. The `lastPaymentDate` field is updated in the athlete profile (accessible from the client edit view) to today's ISO timestamp.
+  </Step>
+  <Step title="Confirm renewal mode">
+    Set **Modo Renovación** to `Automática` if the athlete has an ongoing subscription, or `Manual` if each cycle requires individual confirmation.
+  </Step>
+  <Step title="Status updates automatically">
+    Once the new `nextExpirationDate` is saved, the payment status badge refreshes — overdue entries clear to green, and the dashboard KPI reflects updated totals.
+  </Step>
+</Steps>
+
+## Access Control — Pause & Resume
+
+If an athlete's payment lapses and you need to restrict access while awaiting resolution, the billing table includes a **Pausar / Activar** toggle per athlete. Pausing sets `isPaused: true` on the `User` record, immediately preventing the athlete from logging in. Reactivating restores access in one click.
+
+```
+Athlete access states:
+  Active 🟢  →  isPaused: false
+  Paused ⏸️  →  isPaused: true
+```
+
+## Income Summary
+
+The **Resumen General** dashboard KPI panel surfaces an estimated monthly income figure derived from the sum of all active athletes' plan prices:
+
+```
+Estimated Monthly Income = Σ matchPlan.price for each active ClientProfile
+```
+
+This gives coaches a quick revenue snapshot without needing a separate spreadsheet. The figure updates automatically when new athletes are added or existing athletes change plans.
+
+<Note>
+  FocusFlow's billing module is a **tracking and recording tool** — it does not process actual payments or integrate with payment gateways such as Stripe, PayPal, or Square. All payments are confirmed and recorded manually by the coach. For actual payment collection, coaches should use their preferred external payment method and then update FocusFlow to reflect the confirmed payment date.
+</Note>

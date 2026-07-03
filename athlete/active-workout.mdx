@@ -1,0 +1,185 @@
+---
+title: "Log Workouts with FocusFlow's Interactive Training Mode"
+sidebarTitle: "Active Workout"
+description: "Start your assigned routine, log real-time sets with weight and reps, track rest with the built-in timer, and complete your session with a full workout summary."
+---
+
+The Active Workout mode is FocusFlow's real-time training companion — built to live on your phone screen while you are between sets on the gym floor. It displays every exercise assigned for the day, lets you log exact weight and reps for each set, auto-starts a countdown rest timer the moment you tick a set as complete, and saves a full `WorkoutSummary` when you finish. Everything is optimised for one-handed use on a mobile screen.
+
+## Starting a Workout
+
+<Steps>
+  <Step title="Open the Workout tab">
+    Tap **Mi Entrenamiento** in the navigation bar. FocusFlow reads your assigned `Routine` (the one with `isActive: true`) and automatically highlights today's `RoutineDay` based on your weekly schedule.
+  </Step>
+  <Step title="Review today's plan">
+    Before you begin, each exercise card shows the coach's planned configuration:
+
+    | Field | What it means |
+    |---|---|
+    | `setsCount` | Number of sets planned |
+    | `repsText` | Target rep range, e.g. `"8-10"` or `"3x5"` |
+    | `expectedWeight` | Coach-suggested starting weight in kg |
+    | `intensity` | Effort target expressed as RPE or RIR, e.g. `"RPE 8"` or `"RIR 2"` |
+    | `notes` | Any technique or execution notes left by your coach |
+
+  </Step>
+  <Step title="Tap Start Workout">
+    Press the **Empezar Entrenamiento** button. A general session stopwatch starts counting up from zero and the interface switches to interactive mode — input fields activate for every set row.
+  </Step>
+</Steps>
+
+<Tip>
+  If the day you want to train is not the one pre-selected, tap any day pill in the day-switcher bar at the top of the Workout tab before starting. The switcher shows colour-coded pills: green for completed this week, amber for optional days, and red for pending required days.
+</Tip>
+
+## Logging a Set
+
+Each exercise is displayed as a card. Inside every card, each planned set occupies its own row with two input fields.
+
+<Steps>
+  <Step title="Enter weight and reps">
+    Tap the **Peso (kg)** field and enter the actual weight you lifted. Then tap **Reps reales** and enter the repetitions you achieved. Both fields accept decimal values (use a comma or period as the decimal separator on mobile).
+  </Step>
+  <Step title="Mark the set complete">
+    Tap the green **Completar** button (✓) on that set row. The row turns green and the rest timer starts automatically. The underlying `ExerciseSet` is updated with:
+
+    ```typescript
+    {
+      achievedReps: number,   // actual reps performed
+      weightUsed: number,     // actual weight lifted in kg
+      completed: true,
+      skipped: false
+    }
+    ```
+  </Step>
+  <Step title="Skip a set (optional)">
+    If you need to skip a set due to fatigue or injury, tap the red **Omitir** button (✗). The set is recorded as:
+
+    ```typescript
+    {
+      completed: false,
+      skipped: true
+    }
+    ```
+
+    You can also skip an entire exercise at once using the **Omitir Ejercicio** button in the top-right corner of the exercise card.
+  </Step>
+</Steps>
+
+## 1RM / Historical Best Weight Indicator
+
+As you prepare to log a set, FocusFlow shows a suggested weight value pre-filled in the weight input. This suggestion is the **highest weight you have ever lifted for that specific exercise** across all past `WorkoutSummary` records — your running personal record. It is calculated by scanning every completed set in your history that matches the exercise name:
+
+```typescript
+// Pseudocode — from InteractiveTraining.tsx getMaxWeightForExercise()
+summaries.forEach(summary => {
+  Object.keys(summary.loggedExercises).forEach(exerciseId => {
+    if (exerciseDetails[exerciseId].name === targetExerciseName) {
+      summary.loggedExercises[exerciseId].forEach(set => {
+        if (set.completed && set.weightUsed > currentMax) {
+          currentMax = set.weightUsed;
+        }
+      });
+    }
+  });
+});
+```
+
+Use this number as a baseline. If you beat it today, your new record becomes the suggestion for next time.
+
+## Rest Timer
+
+The rest timer is an integral part of the active workout flow — it activates automatically so you never need to start it manually.
+
+<Steps>
+  <Step title="Automatic start">
+    Immediately after you mark a set as **Completar**, FocusFlow starts a countdown timer. The default rest period is taken from `Routine.globalRestSeconds` (set by your coach). If no value is configured, the default is **180 seconds (3 minutes)**.
+  </Step>
+  <Step title="Watch the countdown">
+    The timer appears in the sticky session header at the top of the screen. While scrolling down the exercise list, a floating **Dynamic Island** pill at the top of the viewport also shows the remaining rest time so it is always in view.
+  </Step>
+  <Step title="Timer expiry alerts">
+    When the countdown reaches zero, FocusFlow fires three simultaneous alerts to grab your attention no matter where you are in the app:
+    - **Visual flash** — the rest timer element pulses and the display shows `0`.
+    - **Audio chime** — a multi-tone electronic beep plays via `playRestTimerEndSound()`.
+    - **Device vibration** — a `[400, 150, 400, 150, 500]` ms haptic pattern fires on Android and supported iOS devices.
+  </Step>
+  <Step title="Skip rest early">
+    If you feel ready before the timer expires, tap **Omitir** next to the rest countdown to dismiss it and move straight to your next set.
+  </Step>
+</Steps>
+
+<Note>
+  FocusFlow uses a background Web Worker and a silent Audio API keep-alive to ensure the rest timer continues ticking accurately even when your phone screen locks or you switch to another app. Grant notification permissions when prompted so the app can also push a background alert if you are away from the screen.
+</Note>
+
+## Retroactive Logging
+
+Missed logging a session in real time? You can still record it after the fact.
+
+Before tapping **Start Workout**, use the **date picker** that appears in the session-start panel to select the date of the missed session. The workout will be recorded with `WorkoutSummary.date` set to that past date instead of today. The selected day will appear as completed (green) on the Calendar tab for that historical date.
+
+## Completing a Session
+
+<Steps>
+  <Step title="Tap Finish Workout">
+    When all sets are done, tap the **Finalizar** button in the sticky session header (or the floating pill at the top when scrolled). FocusFlow validates that at least one set has been logged — if the session is empty a warning modal will appear.
+  </Step>
+  <Step title="Session is saved">
+    A `WorkoutSummary` document is created and persisted to Firestore with the following fields:
+
+    ```typescript
+    interface WorkoutSummary {
+      id: string;
+      clientId: string;
+      routineId: string;
+      dayId: string;
+      dayName: string;
+      date: string;            // YYYY-MM-DD (or retroDate if back-logged)
+      timeSpentSeconds: number; // total elapsed seconds from the session stopwatch
+      totalVolume: number;      // sum of (achievedReps × weightUsed) for all completed sets
+      completionRate: number;   // percentage of sets completed vs sets planned
+      isRestDay: boolean;
+      loggedExercises: { [routineExerciseId: string]: ExerciseSet[] };
+      loggedExerciseDetails: { [routineExerciseId: string]: { name: string; category: string; userNotes?: string } };
+    }
+    ```
+  </Step>
+  <Step title="Calendar update">
+    The completed date is marked green on your **Calendar** tab. Your coach can also see the completed session in the **Sesiones** sub-tab of your athlete profile.
+  </Step>
+</Steps>
+
+## ActiveWorkoutSession State Reference
+
+While a workout is in progress, FocusFlow maintains an `ActiveWorkoutSession` object in memory and periodically syncs it to Firestore. This is what allows the session to survive tab switches, phone screen-locks, and app backgrounding.
+
+```typescript
+export interface ActiveWorkoutSession {
+  clientId: string;
+  routineId: string;
+  dayId: string;
+  dayName: string;
+  startTime: string;       // ISO 8601 timestamp when the session was started
+  isStarted: boolean;
+  isRestDay: boolean;
+  isPaused?: boolean;      // true while the session is manually paused
+  elapsedSeconds?: number; // synced every 10 seconds for background persistence
+  retroDate?: string;      // YYYY-MM-DD date override for back-logged sessions
+  exercises: {
+    [routineExerciseId: string]: ExerciseSet[];
+  };
+  exerciseNotes?: {
+    [routineExerciseId: string]: string; // per-exercise athlete notes
+  };
+}
+```
+
+## Pausing a Session
+
+Tap **⏸️ Pausar** in the session header to pause the stopwatch. While paused, the exercise cards are blurred and a fullscreen overlay appears with a **Reanudar** button. Your logged set data is preserved exactly as-is. The `isPaused` flag is set to `true` on the active session object.
+
+## Rest Days
+
+If your coach schedules a rest day, or if you tap the **Marcar Descanso** option in the Workout tab, a `WorkoutSummary` is created with `isRestDay: true` and `completionRate: 100`. The Calendar tab marks the day with a rest indicator. You will see an encouraging message in place of the exercise list — no sets to log, just a prompt to rest, walk, stretch, and sleep well.
